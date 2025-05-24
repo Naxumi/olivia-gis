@@ -46,14 +46,14 @@ return new class extends Migration {
             $table->decimal('latitude', 10, 6);
             $table->decimal('longitude', 10, 6);
             // Tambahkan timestamps jika diperlukan
-            // $table->timestamps();
+            $table->timestamps();
         });
 
         Schema::create('categories', function (Blueprint $table) {
             $table->id();
             $table->string('name')->unique();
             // Tambahkan timestamps jika diperlukan
-            // $table->timestamps();
+            $table->timestamps();
         });
 
         Schema::create('wastes', function (Blueprint $table) {
@@ -67,7 +67,7 @@ return new class extends Migration {
             $table->text('description');
             $table->integer('sold_count')->default(0);
             // Tambahkan timestamps jika diperlukan
-            // $table->timestamps();
+            $table->timestamps();
         });
 
         Schema::create('waste_variants', function (Blueprint $table) {
@@ -77,7 +77,7 @@ return new class extends Migration {
             $table->decimal('price', 10, 2);
             $table->integer('stock');
             // Tambahkan timestamps jika diperlukan
-            // $table->timestamps();
+            $table->timestamps();
         });
 
         Schema::create('reviews', function (Blueprint $table) {
@@ -138,7 +138,7 @@ return new class extends Migration {
             $table->string('contact_person');
             $table->string('phone_number');
             // Tambahkan timestamps jika diperlukan
-            // $table->timestamps();
+            $table->timestamps();
         });
 
         Schema::create('certificates', function (Blueprint $table) {
@@ -149,7 +149,7 @@ return new class extends Migration {
             $table->decimal('carbon_offset_kg', 10, 2);
             $table->timestamp('issued_at');
             // Tambahkan timestamps (created_at, updated_at) jika diperlukan
-            // $table->timestamps();
+            $table->timestamps();
         });
 
         Schema::create('recycling_facilities', function (Blueprint $table) {
@@ -172,7 +172,7 @@ return new class extends Migration {
             $table->foreignId('waste_category_id')->constrained('categories');
             $table->text('description')->nullable();
             // Tambahkan timestamps jika diperlukan
-            // $table->timestamps();
+            $table->timestamps();
         });
     }
 

@@ -11,6 +11,10 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules;
 use Illuminate\View\View;
+use App\Models\Role;
+use Illuminate\Support\Facades\DB; // Untuk transaction
+use Illuminate\Validation\Rules\Enum; // Jika role diambil dari Enum
+
 
 class RegisteredUserController extends Controller
 {
@@ -19,7 +23,8 @@ class RegisteredUserController extends Controller
      */
     public function create(): View
     {
-        return view('auth.register');
+        $roles = Role::whereIn('name', ['buyer', 'seller', 'distributor'])->get();
+        return view('auth.register', compact('roles'));
     }
 
     /**
@@ -31,20 +36,30 @@ class RegisteredUserController extends Controller
     {
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
+            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:' . User::class],
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            'role_id' => ['required', 'exists:roles,id'], // Pastikan role_id yang dipilih valid
         ]);
 
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-        ]);
+        DB::beginTransaction();
+        try {
+            $user = User::create([
+                'name' => $request->name,
+                'email' => $request->email,
+                'password' => Hash::make($request->password),
+            ]);
 
-        event(new Registered($user));
+            $user->roles()->attach($request->role_id); // Menghubungkan user dengan role
 
-        Auth::login($user);
+            event(new Registered($user));
+            Auth::login($user);
+            DB::commit();
+            return redirect(route('dashboard', absolute: false)); // Atau halaman lain
 
-        return redirect(route('dashboard', absolute: false));
+        } catch (\Exception $e) {
+            DB::rollBack();
+            // Log error atau tampilkan pesan error
+            return back()->withInput()->withErrors(['error' => 'Registrasi gagal, silakan coba lagi.']);
+        }
     }
 }
