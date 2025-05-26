@@ -7,6 +7,7 @@ use App\Http\Controllers\WasteController;
 use App\Http\Controllers\WasteVariantController;
 use App\Http\Controllers\MarketplaceController;
 use App\Http\Controllers\TransactionController;
+use App\Models\Transaction; // Jika Anda perlu mengambil data transaksi untuk ditampilkan
 
 Route::get('/', function () {
     return view('welcome');
@@ -62,5 +63,34 @@ Route::middleware(['auth'])->group(function () {
     // PUT    /wastes/{waste}/variants/{variant}  (wastes.variants.update) -> WasteVariantController@update
     // DELETE /wastes/{waste}/variants/{variant}  (wastes.variants.destroy) -> WasteVariantController@destroy (jika diimplementasikan)
 });
+
+
+Route::middleware('auth:sanctum')->group(function () { // Atau middleware 'auth' jika web
+    Route::post('/transactions', [TransactionController::class, 'store'])->name('transactions.store'); // Buyer
+    Route::patch('/transactions/{transaction}/confirm-by-seller', [TransactionController::class, 'confirmBySeller'])->name('transactions.confirm_by_seller'); // Seller atau Admin
+    Route::patch('/transactions/{transaction}/pickup-by-distributor', [TransactionController::class, 'markAsPickedUpByDistributor'])->name('transactions.pickup_by_distributor'); // Distributor
+    Route::patch('/transactions/{transaction}/deliver-by-distributor', [TransactionController::class, 'markAsDeliveredByDistributor'])->name('transactions.deliver_by_distributor'); // Distributor
+    Route::patch('/transactions/{transaction}/cancel', [TransactionController::class, 'cancel'])->name('transactions.cancel'); // Buyer/Seller/Admin
+
+    Route::get('/transactions/{transaction}', [TransactionController::class, 'show'])->name('transactions.show');
+    Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');
+});
+
+Route::get('/test-transactions', function () {
+    // Ambil beberapa data untuk diisi di form jika perlu, misal daftar waste variants, users, dll.
+    $waste_variants = \App\Models\WasteVariant::take(5)->get();
+    $users = \App\Models\User::take(5)->get(); // Terutama yang punya peran distributor
+    $transactions_pending = Transaction::where('status', Transaction::STATUS_PENDING)->take(5)->get();
+    $transactions_confirmed = Transaction::where('status', Transaction::STATUS_CONFIRMED)->take(5)->get();
+    $transactions_picked_up = Transaction::where('status', Transaction::STATUS_PICKED_UP)->take(5)->get();
+
+    return view('test_transactions', compact(
+        'waste_variants',
+        'users',
+        'transactions_pending',
+        'transactions_confirmed',
+        'transactions_picked_up'
+    ));
+})->middleware('auth'); // Pastikan hanya user terautentikasi yang bisa akses
 
 require __DIR__ . '/auth.php';
