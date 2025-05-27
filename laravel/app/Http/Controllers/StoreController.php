@@ -17,12 +17,30 @@ class StoreController extends Controller
      * Display a listing of the resource.
      */
     public function index()
-    {
-        // Tampilkan toko milik seller yang login, atau semua toko jika admin
-        /** @var \App\Models\User $user */ // Type hint untuk Intelephense
-        $stores = Auth::user()->stores()->latest()->get();
-        return view('stores.index', compact('stores'));
-    }
+{
+    /** @var \App\Models\User $user */
+    $user = Auth::user();
+    $itemsPerPage = 10; // Tentukan jumlah item per halaman, bisa juga dari config atau request
+
+    // Logika yang sudah ada: Tampilkan toko milik user yang login
+    $stores = $user->stores()->latest()->paginate($itemsPerPage);
+
+    // Jika Anda ingin mengimplementasikan "atau semua toko jika admin":
+    // if ($user->isAdmin()) { // Asumsi Anda punya method isAdmin() di model User atau cara lain untuk cek role
+    //     $stores = \App\Models\Store::latest()->paginate($itemsPerPage); // Ambil semua toko untuk admin
+    // } else {
+    //     $stores = $user->stores()->latest()->paginate($itemsPerPage);
+    // }
+
+    return view('stores.index', compact('stores'));
+}
+    // public function index()
+    // {
+    //     // Tampilkan toko milik seller yang login, atau semua toko jika admin
+    //     /** @var \App\Models\User $user */ // Type hint untuk Intelephense
+    //     $stores = Auth::user()->stores()->latest()->get();
+    //     return view('stores.index', compact('stores'));
+    // }
 
     /**
      * Show the form for creating a new resource.

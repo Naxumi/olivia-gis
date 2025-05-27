@@ -1,89 +1,187 @@
-<x-app-layout>
-    <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
-            {{ __('Daftar Limbah untuk Toko: ') . $store->name }}
-        </h2>
-    </x-slot>
 
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="p-6 text-gray-900 dark:text-gray-100">
+{{-- @extends('layouts.app') --}}
+<!DOCTYPE html>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Peta Limbah Interaktif</title>
 
-                    <div class="mb-4">
-                        <a href="{{ route('stores.show', $store->id) }}"
-                            class="text-sm text-blue-600 dark:text-blue-400 hover:underline mr-4">
-                            &larr; Kembali ke Detail Toko
-                        </a>
-                        <a href="{{ route('stores.wastes.create', $store->id) }}"
-                            class="inline-flex items-center px-4 py-2 bg-blue-600 dark:bg-blue-400 border border-transparent rounded-md font-semibold text-xs text-white dark:text-gray-800 uppercase tracking-widest hover:bg-blue-500 dark:hover:bg-blue-500 active:bg-blue-700 dark:active:bg-blue-300 focus:outline-none focus:border-blue-700 dark:focus:border-blue-300 focus:ring ring-blue-300 dark:focus:ring-blue-600 disabled:opacity-25 transition ease-in-out duration-150">
-                            {{ __('+ Tambah Limbah Baru') }}
-                        </a>
-                    </div>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+          crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+            crossorigin=""></script>
 
-                    @if ($wastes->isEmpty())
-                        <p>{{ __('Toko ini belum memiliki daftar limbah.') }}</p>
-                    @else
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                                <thead class="bg-gray-50 dark:bg-gray-700">
-                                    <tr>
-                                        <th scope="col"
-                                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                            Nama Limbah</th>
-                                        <th scope="col"
-                                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                            Kategori</th>
-                                        <th scope="col"
-                                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                            Stok Utama</th>
-                                        <th scope="col"
-                                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                            Status</th>
-                                        <th scope="col"
-                                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                            Harga Default</th>
-                                        <th scope="col" class="relative px-6 py-3"><span class="sr-only">Aksi</span>
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                                    @foreach ($wastes as $waste)
-                                        <tr>
-                                            <td
-                                                class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                                                {{ $waste->name }}</td>
-                                            <td
-                                                class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                                {{ $waste->category->name ?? '-' }}</td>
-                                            <td
-                                                class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                                {{ $waste->stock }}</td>
-                                            <td
-                                                class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                                {{ ucfirst($waste->status) }}</td>
-                                            <td
-                                                class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                                Rp {{ number_format($waste->price, 0, ',', '.') }}</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                <a href="{{ route('wastes.variants.index', $waste->id) }}"
-                                                    class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-200 mr-2">Kelola
-                                                    Varian</a>
-                                                {{-- Tambahkan link untuk edit/hapus waste jika perlu --}}
-                                                {{-- <a href="{{ route('stores.wastes.edit', [$store->id, $waste->id]) }}" class="text-yellow-600 hover:text-yellow-900 mr-2">Edit</a> --}}
-                                                {{-- Form Hapus --}}
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                        <div class="mt-4">
-                            {{ $wastes->links() }}
-                        </div>
-                    @endif
-                </div>
+    <style>
+        body { margin: 0; font-family: Arial, sans-serif; }
+        #map-container {
+            display: flex;
+            height: 100vh; /* Tinggi penuh viewport */
+            width: 100vw; /* Lebar penuh viewport */
+        }
+        #map {
+            flex-grow: 1; /* Peta mengambil sisa ruang */
+            height: 100%;
+        }
+        #waste-details-sidebar {
+            width: 350px; /* Lebar sidebar, bisa disesuaikan */
+            height: 100%;
+            overflow-y: auto; /* Scroll jika konten panjang */
+            padding: 20px;
+            box-sizing: border-box;
+            background-color: #f8f9fa;
+            border-left: 1px solid #dee2e6;
+            transition: transform 0.3s ease-in-out; /* Animasi halus */
+            transform: translateX(100%); /* Sembunyikan di awal */
+        }
+        #waste-details-sidebar.visible {
+            transform: translateX(0); /* Tampilkan sidebar */
+        }
+        #details-content h3 { margin-top: 0; }
+        #close-sidebar-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            cursor: pointer;
+            font-size: 1.5em;
+            background: none;
+            border: none;
+        }
+        .leaflet-popup-content-wrapper {
+            border-radius: 5px;
+        }
+        .leaflet-popup-content {
+            font-size: 1.1em;
+        }
+    </style>
+</head>
+<body>
+    <div id="map-container">
+        <div id="map"></div>
+        <div id="waste-details-sidebar">
+            <button id="close-sidebar-btn" title="Tutup Detail">&times;</button>
+            <h3>Detail Limbah</h3>
+            <hr>
+            <div id="details-content">
+                <p>Klik marker di peta untuk melihat detail.</p>
             </div>
         </div>
     </div>
-</x-app-layout>
+
+    <script>
+        // Inisialisasi peta dengan koordinat default dari controller
+        const initialLat = {{ $defaultLocation['lat'] }};
+        const initialLng = {{ $defaultLocation['lng'] }};
+        const map = L.map('map').setView([initialLat, initialLng], 11); // Zoom level bisa disesuaikan
+
+        // Tambahkan tile layer (misalnya OpenStreetMap)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        const sidebar = document.getElementById('waste-details-sidebar');
+        const detailsContent = document.getElementById('details-content');
+        const closeBtn = document.getElementById('close-sidebar-btn');
+        let activeMarker = null;
+        const markers = {}; // Untuk menyimpan referensi marker
+
+        closeBtn.addEventListener('click', () => {
+            sidebar.classList.remove('visible');
+            if (activeMarker) {
+                // Mungkin reset style marker aktif jika ada
+                activeMarker = null;
+            }
+        });
+
+        async function fetchWasteDetails(wasteId) {
+            detailsContent.innerHTML = '<p>Memuat detail...</p>';
+            sidebar.classList.add('visible');
+
+            try {
+                const response = await fetch(`/api/wastes/${wasteId}/details`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const waste = await response.json();
+
+                let html = `<h3>${waste.name || 'Nama Tidak Tersedia'}</h3>`;
+                html += `<p><strong>ID:</strong> ${waste.id}</p>`;
+                html += `<p><strong>Deskripsi:</strong> ${waste.description || 'Tidak ada deskripsi.'}</p>`;
+                html += `<p><strong>Lokasi:</strong> Lat: ${waste.latitude}, Lng: ${waste.longitude}</p>`;
+
+                // Tampilkan gambar jika ada (sesuaikan path dan storage link)
+                if (waste.image_path) {
+                    // Pastikan Anda sudah menjalankan `php artisan storage:link`
+                    // dan image_path adalah path relatif dari direktori public/storage
+                    html += `<img src="/storage/${waste.image_path}" alt="${waste.name}" style="width:100%; max-width:300px; margin-top:10px; border-radius:5px;">`;
+                }
+
+                if (waste.variants && waste.variants.length > 0) {
+                    html += '<h4>Varian:</h4><ul>';
+                    waste.variants.forEach(variant => {
+                        html += `<li>${variant.name || 'Varian'} (${variant.attribute || 'Atribut tidak ada'})</li>`; // Sesuaikan field variant
+                    });
+                    html += '</ul>';
+                }
+                // Tambahkan detail lain yang relevan dari objek 'waste'
+
+                detailsContent.innerHTML = html;
+            } catch (error) {
+                console.error("Tidak dapat mengambil detail limbah:", error);
+                detailsContent.innerHTML = '<p>Gagal memuat detail limbah. Silakan coba lagi.</p>';
+            }
+        }
+
+        async function loadWastesOnMap() {
+            try {
+                const response = await fetch('/api/wastes/map-data');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const wastes = await response.json();
+
+                if (wastes.length === 0) {
+                    console.log("Tidak ada data limbah untuk ditampilkan di peta.");
+                    return;
+                }
+
+                const markerBounds = L.latLngBounds();
+
+                wastes.forEach(waste => {
+                    if (waste.latitude && waste.longitude) {
+                        const marker = L.marker([waste.latitude, waste.longitude]).addTo(map);
+                        marker.bindPopup(`<b>${waste.name}</b><br>Klik untuk detail.`);
+
+                        marker.on('click', () => {
+                            if (activeMarker) {
+                                // Reset style marker sebelumnya jika perlu
+                            }
+                            activeMarker = marker;
+                            // Highlight marker aktif jika perlu
+                            fetchWasteDetails(waste.id);
+                            map.setView([waste.latitude, waste.longitude], 15); // Pusatkan peta ke marker yang diklik
+                        });
+                        markers[waste.id] = marker; // Simpan marker
+                        markerBounds.extend([waste.latitude, waste.longitude]);
+                    }
+                });
+
+                // Sesuaikan view peta agar semua marker terlihat, jika ada marker
+                if (markerBounds.isValid()) {
+                    map.fitBounds(markerBounds.pad(0.1)); // pad(0.1) memberi sedikit padding
+                }
+
+            } catch (error) {
+                console.error("Tidak dapat memuat data limbah di peta:", error);
+                // Bisa tambahkan notifikasi error di halaman
+            }
+        }
+
+        // Panggil fungsi untuk memuat data saat halaman siap
+        document.addEventListener('DOMContentLoaded', loadWastesOnMap);
+
+    </script>
+</body>
+</html>

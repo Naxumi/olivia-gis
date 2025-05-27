@@ -7,6 +7,7 @@ use App\Http\Controllers\WasteController;
 use App\Http\Controllers\WasteVariantController;
 use App\Http\Controllers\MarketplaceController;
 use App\Http\Controllers\TransactionController;
+use App\Models\Waste;
 
 Route::get('/', function () {
     return view('welcome');
@@ -62,5 +63,8 @@ Route::middleware(['auth'])->group(function () {
     // PUT    /wastes/{waste}/variants/{variant}  (wastes.variants.update) -> WasteVariantController@update
     // DELETE /wastes/{waste}/variants/{variant}  (wastes.variants.destroy) -> WasteVariantController@destroy (jika diimplementasikan)
 });
+
+Route::get('/waste-map', [WasteController::class, 'index'])->name('waste.index');
+
 
 require __DIR__ . '/auth.php';
