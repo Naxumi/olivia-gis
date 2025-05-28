@@ -109,4 +109,14 @@ class Transaction extends Model
         return $this->hasMany(EcoPointLog::class, 'reference_id')
             ->where('source_type', EcoPointLog::SOURCE_TRANSACTION ?? 'transaction');
     }
+
+    /**
+     * Mendapatkan semua log eco points yang terkait dengan transaksi ini.
+     */
+    public function ecoPointLogs(): HasMany // <-- TAMBAHKAN METHOD RELASI INI
+    {
+        // Menggunakan konstanta dari model EcoPointLog jika ada, atau string literal
+        return $this->hasMany(EcoPointLog::class, 'reference_id')
+                    ->where('source_type', EcoPointLog::SOURCE_TRANSACTION); // atau ->where('source_type', 'transaction');
+    }
 }

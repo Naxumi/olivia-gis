@@ -6,7 +6,7 @@ namespace App\Http\Controllers;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 // use Illuminate\Foundation\Auth\User as Authenticatable;
 // use Illuminate\Notifications\Notifiable;
-// use Spatie\Permission\Traits\HasRoles;
+use Spatie\Permission\Traits\HasRoles;
 
 // use App\Models\Transaction;
 // use App\Models\WasteVariant;
@@ -86,7 +86,7 @@ class TransactionController extends Controller
             ]);
 
             // Opsional: Kurangi stok "dipesan" atau mekanisme serupa
-            // $wasteVariant->decrement('stock', $request->quantity);
+            $wasteVariant->decrement('stock', $request->quantity);
 
             DB::commit();
             Log::info("Transaction {$transaction->id} created by Buyer {$buyer->id}. Status: PENDING.");
@@ -206,7 +206,7 @@ class TransactionController extends Controller
             Log::info("Transaction {$transaction->id} marked as picked_up by Distributor {$distributor->id}. Status: PICKED_UP.");
             // TODO: Notifikasi ke Buyer & Seller
             // $transaction->buyer->notify(new TransactionStatusUpdated($transaction, 'Pesanan Sudah Diambil oleh Kurir'));
-            // $transaction->seller->notify(new TransactionStatusUpdated($transaction, 'Pesanan Sudah Diambil oleh Kurir'));
+            // $transactiondecr->seller->notify(new TransactionStatusUpdated($transaction, 'Pesanan Sudah Diambil oleh Kurir'));
 
             return response()->json(['message' => 'Transaksi ditandai sudah diambil.', 'transaction' => $transaction->load('logistics')]);
         } catch (\Exception $e) {
@@ -245,8 +245,8 @@ class TransactionController extends Controller
             // 1. Finalisasi Stok
             $wasteVariant = $transaction->wasteVariant; // Relasi sudah di-load jika perlu
             if ($wasteVariant) {
-                $newStock = $wasteVariant->stock - $transaction->quantity;
-                $wasteVariant->stock = max(0, $newStock);
+                // $newStock = $wasteVariant->stock - $transaction->quantity;
+                // $wasteVariant->stock = max(0, $newStock);
                 $wasteVariant->save();
 
                 $parentWaste = $wasteVariant->waste;

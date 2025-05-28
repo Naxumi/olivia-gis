@@ -16,7 +16,7 @@ class Waste extends Model
 
     public function store(): BelongsTo
     {
-        return $this->belongsTo(Store::class);
+        return $this->belongsTo(Store::class); // Relasi ke Store, asumsikan Waste dimiliki oleh Store
     }
 
     public function category(): BelongsTo
