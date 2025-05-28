@@ -7,10 +7,11 @@ use App\Http\Controllers\WasteController;
 use App\Http\Controllers\WasteVariantController;
 use App\Http\Controllers\MarketplaceController;
 use App\Http\Controllers\TransactionController;
-use App\Models\Transaction; // Jika Anda perlu mengambil data transaksi untuk ditampilkan
+use App\Models\Waste;
+use App\Models\Transaction;
 
 Route::get('/', function () {
-    return view('welcome');
+    return view('landing');
 });
 
 Route::get('/dashboard', function () {
@@ -63,6 +64,8 @@ Route::middleware(['auth'])->group(function () {
     // PUT    /wastes/{waste}/variants/{variant}  (wastes.variants.update) -> WasteVariantController@update
     // DELETE /wastes/{waste}/variants/{variant}  (wastes.variants.destroy) -> WasteVariantController@destroy (jika diimplementasikan)
 });
+
+Route::get('/waste-map', [WasteController::class, 'index'])->name('waste.index');
 
 
 Route::middleware('auth:sanctum')->group(function () { // Atau middleware 'auth' jika web
