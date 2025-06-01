@@ -17,23 +17,23 @@ class StoreController extends Controller
      * Display a listing of the resource.
      */
     public function index()
-{
-    /** @var \App\Models\User $user */
-    $user = Auth::user();
-    $itemsPerPage = 10; // Tentukan jumlah item per halaman, bisa juga dari config atau request
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        $itemsPerPage = 10; // Tentukan jumlah item per halaman, bisa juga dari config atau request
 
-    // Logika yang sudah ada: Tampilkan toko milik user yang login
-    $stores = $user->stores()->latest()->paginate($itemsPerPage);
+        // Logika yang sudah ada: Tampilkan toko milik user yang login
+        $stores = $user->stores()->latest()->paginate($itemsPerPage);
 
-    // Jika Anda ingin mengimplementasikan "atau semua toko jika admin":
-    // if ($user->isAdmin()) { // Asumsi Anda punya method isAdmin() di model User atau cara lain untuk cek role
-    //     $stores = \App\Models\Store::latest()->paginate($itemsPerPage); // Ambil semua toko untuk admin
-    // } else {
-    //     $stores = $user->stores()->latest()->paginate($itemsPerPage);
-    // }
+        // Jika Anda ingin mengimplementasikan "atau semua toko jika admin":
+        // if ($user->isAdmin()) { // Asumsi Anda punya method isAdmin() di model User atau cara lain untuk cek role
+        //     $stores = \App\Models\Store::latest()->paginate($itemsPerPage); // Ambil semua toko untuk admin
+        // } else {
+        //     $stores = $user->stores()->latest()->paginate($itemsPerPage);
+        // }
 
-    return view('stores.index', compact('stores'));
-}
+        return view('stores.index', compact('stores'));
+    }
     // public function index()
     // {
     //     // Tampilkan toko milik seller yang login, atau semua toko jika admin
@@ -80,11 +80,10 @@ class StoreController extends Controller
      */
     public function show(Store $store)
     {
-        $this->authorize('view', $store); // Menggunakan StorePolicy
 
-        // if (Auth::id() !== $store->user_id && !Auth::user()->roles()->where('name', 'admin')->exists()) {
-        //     abort(403, 'Anda tidak diizinkan untuk melihat toko ini.');
-        // }
+        if (Auth::id() !== $store->user_id && !Auth::user()->roles()->where('name', 'admin')->exists()) {
+            abort(403, 'Anda tidak diizinkan untuk melihat toko ini.');
+        }
         // Anda mungkin ingin eager load relasi lain di sini, e.g. $store->load('wastes.wasteVariants');
         return view('stores.show', compact('store'));
     }
@@ -94,12 +93,11 @@ class StoreController extends Controller
      */
     public function edit(Store $store)
     {
-        $this->authorize('update', $store); // Menggunakan StorePolicy
 
         // Jika user bukan seller pemilik toko ini, dan bukan admin
-        // if (Auth::id() !== $store->user_id && !Auth::user()->roles()->where('name', 'admin')->exists()) {
-        //     abort(403, 'Anda tidak diizinkan untuk mengedit toko ini.');
-        // }
+        if (Auth::id() !== $store->user_id && !Auth::user()->roles()->where('name', 'admin')->exists()) {
+            abort(403, 'Anda tidak diizinkan untuk mengedit toko ini.');
+        }
 
         return view('stores.edit', compact('store'));
     }
@@ -109,11 +107,10 @@ class StoreController extends Controller
      */
     public function update(Request $request, Store $store)
     {
-        $this->authorize('update', $store); // Menggunakan StorePolicy
 
-        // if (Auth::id() !== $store->user_id) {
-        //     abort(403, 'Anda tidak diizinkan untuk mengupdate toko ini.');
-        // }
+        if (Auth::id() !== $store->user_id) {
+            abort(403, 'Anda tidak diizinkan untuk mengupdate toko ini.');
+        }
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -134,11 +131,10 @@ class StoreController extends Controller
      */
     public function destroy(Store $store)
     {
-        $this->authorize('delete', $store); // Menggunakan StorePolicy
 
-        // if (Auth::id() !== $store->user_id) {
-        //     abort(403, 'Anda tidak diizinkan untuk menghapus toko ini.');
-        // }
+        if (Auth::id() !== $store->user_id) {
+            abort(403, 'Anda tidak diizinkan untuk menghapus toko ini.');
+        }
 
         // Sebelum menghapus store, Anda mungkin perlu menangani relasi lain,
         // misalnya menghapus semua 'wastes' yang terkait jika onDelete('cascade') tidak diatur

@@ -5,10 +5,16 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory; // Tambahkan jika belum ada dan Anda menggunakan factory
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Clickbar\Magellan\Data\Geometries\Point; // Import Point dari Magellan
 
 class Logistics extends Model
 {
     use HasFactory; // Tambahkan jika belum ada
+
+    public const STATUS_SCHEDULED = 'scheduled';
+    public const STATUS_IN_TRANSIT = 'in_transit';
+    public const STATUS_DELIVERED = 'delivered';
+    public const STATUS_CANCELLED = 'cancelled';
 
     /**
      * Atribut yang dapat diisi secara massal.
@@ -19,12 +25,11 @@ class Logistics extends Model
         'transaction_id',
         'distributor_id',
         'status',
-        'distance_km',              // Opsional, jika diisi saat create
-        'duration_minutes',         // Opsional
-        'estimated_delivery_time',  // Opsional
-        'current_latitude',         // Opsional
-        'current_longitude',        // Opsional
-        // 'last_updated_at' biasanya dihandle otomatis jika $timestamps = true
+        'distance_km',
+        'duration_minutes',
+        'estimated_delivery_time',
+        'current_location', // Kolom PostGIS
+        'last_updated_at',
     ];
 
     /**
@@ -34,11 +39,13 @@ class Logistics extends Model
      */
     protected $casts = [
         'distance_km' => 'decimal:2',
-        'current_latitude' => 'decimal:6',
-        'current_longitude' => 'decimal:6',
+        'duration_minutes' => 'integer',
         'estimated_delivery_time' => 'datetime',
-        // last_updated_at akan otomatis di-cast jika timestamps aktif
+        'current_location' => Point::class, // Casting ke objek Point
+        'last_updated_at' => 'datetime',
     ];
+
+    public $timestamps = false; // Karena DDL Anda tidak punya created_at/updated_at standar
 
     /**
      * Mendapatkan transaksi yang terkait dengan logistik ini.
@@ -55,6 +62,16 @@ class Logistics extends Model
     public function distributorUser(): BelongsTo // Atau public function distributor()
     {
         return $this->belongsTo(User::class, 'distributor_id');
+    }
+
+    public function getDestinationCoordinates(): ?Point
+    {
+        // Ambil delivery_location dari relasi transaction
+        // Pastikan transaction model memiliki cast Point::class untuk delivery_location
+        if ($this->transaction && $this->transaction->delivery_location instanceof Point) {
+            return $this->transaction->delivery_location;
+        }
+        return null;
     }
 
     // Jika Anda tidak menggunakan kolom updated_at default dari Eloquent,
@@ -82,7 +99,6 @@ class Logistics extends Model
     // Atau, tambahkan `created_at` ke DDL jika ingin Eloquent mengelolanya.
 
     // Untuk saat ini, dengan DDL yang ada:
-    public $timestamps = false; // Karena tidak ada kolom 'created_at' & 'updated_at' standar
     // `last_updated_at` memiliki default di DB untuk pembuatan.
     // Untuk update `last_updated_at`, Anda perlu melakukannya manual.
     // Di controller Anda sudah ada: $transaction->logistics->update(['status' => 'in_transit', 'last_updated_at' => Carbon::now()]);

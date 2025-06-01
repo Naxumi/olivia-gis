@@ -39,6 +39,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
+use Clickbar\Magellan\Data\Geometries\Point; // Import Point
 
 class TransactionController extends Controller
 {
@@ -51,14 +52,21 @@ class TransactionController extends Controller
         $request->validate([
             'waste_variant_id' => 'required|exists:waste_variants,id',
             'quantity' => 'required|integer|min:1',
-            'payment_method' => 'required|string|in:cod,bank_transfer_bca,dll', // Sesuaikan dengan metode pembayaran Anda
-            // logistics_id bisa diisi nanti oleh seller atau distributor
+            'payment_method' => 'required|string|in:cod,bank_transfer_bca,dll', // Sesuaikan
+            // Tidak perlu validasi address_id atau field delivery_* dari request
+            // karena kita akan mengambil dari profil buyer yang login
         ]);
 
         $buyer = Auth::user();
-        if (!$buyer || !$buyer->hasRole('buyer')) { // Pastikan yang membuat adalah buyer
+        if (!$buyer || !$buyer->hasRole('buyer')) {
             return response()->json(['message' => 'Hanya buyer yang dapat membuat transaksi.'], 403);
         }
+
+        // Pastikan buyer memiliki data lokasi di profilnya
+        if (!$buyer->location instanceof Point || is_null($buyer->location->getLatitude()) || is_null($buyer->location->getLongitude())) {
+            return response()->json(['message' => 'Harap lengkapi data lokasi (latitude/longitude) di profil Anda untuk alamat pengiriman.'], 422);
+        }
+        $buyerLocationPoint = $buyer->location; // Ini sudah objek Point
 
         $wasteVariant = WasteVariant::with('waste.store.user')->findOrFail($request->waste_variant_id);
 
@@ -83,18 +91,28 @@ class TransactionController extends Controller
                 'status' => Transaction::STATUS_PENDING,
                 'payment_method' => $request->payment_method,
                 'eco_points_earned' => 0,
+
+                // Salin alamat dari profil buyer ke transaksi
+                'delivery_recipient_name' => $buyer->name, // Atau nama penerima jika ada field terpisah di profil user
+                'delivery_phone_number' => $buyer->phone_number,
+                'delivery_address_detail' => $buyer->address_detail,
+                'delivery_village' => $buyer->village,
+                'delivery_subdistrict' => $buyer->subdistrict,
+                'delivery_city_regency' => $buyer->city_regency,
+                'delivery_province' => $buyer->province,
+                'delivery_postal_code' => $buyer->postal_code,
+                'delivery_location' => $buyerLocationPoint, // Simpan objek Point
+                'delivery_notes' => $buyer->address_notes, // Atau dari input request jika ada field catatan pengiriman
             ]);
 
-            // Opsional: Kurangi stok "dipesan" atau mekanisme serupa
             $wasteVariant->decrement('stock', $request->quantity);
 
             DB::commit();
             Log::info("Transaction {$transaction->id} created by Buyer {$buyer->id}. Status: PENDING.");
-            // TODO: Notifikasi ke Seller
-            // $seller->notify(new NewOrderNotification($transaction));
+            // ... (notifikasi)
 
             return response()->json([
-                'message' => 'Transaksi berhasil dibuat dan menunggu konfirmasi dari penjual.',
+                'message' => 'Transaksi berhasil dibuat dan menunggu konfirmasi.',
                 'transaction' => $transaction
             ], 201);
         } catch (\Exception $e) {

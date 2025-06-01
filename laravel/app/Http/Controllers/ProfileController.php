@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\View\View;
+use Clickbar\Magellan\Data\Geometries\Point; // Import Point dari Magellan
 
 class ProfileController extends Controller
 {
@@ -26,13 +27,31 @@ class ProfileController extends Controller
      */
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
-        $request->user()->fill($request->validated());
+        $user = $request->user();
+        $validatedData = $request->validated();
 
-        if ($request->user()->isDirty('email')) {
-            $request->user()->email_verified_at = null;
+        // Isi atribut pengguna dengan data yang divalidasi (kecuali lat/lon)
+        $user->fill($validatedData);
+
+        // Handle pembuatan Point jika latitude dan longitude ada
+        if (isset($validatedData['latitude']) && isset($validatedData['longitude'])) {
+            $user->location = Point::makeGeodetic( // SRID 4326 default
+                latitude: (float)$validatedData['latitude'],
+                longitude: (float)$validatedData['longitude']
+            );
+        } elseif (array_key_exists('latitude', $validatedData) || array_key_exists('longitude', $validatedData)) {
+            // Jika salah satu ada tapi tidak keduanya, atau jika dikirim sebagai null, set lokasi ke null
+            // Ini berguna jika Anda ingin mengizinkan pengguna menghapus lokasi mereka
+            $user->location = null;
+        }
+        // Jika latitude dan longitude tidak ada dalam request, $user->location tidak akan diubah
+        // kecuali jika field tersebut secara eksplisit dikirim sebagai null dan Anda ingin menanganinya.
+
+        if ($user->isDirty('email')) {
+            $user->email_verified_at = null;
         }
 
-        $request->user()->save();
+        $user->save();
 
         return Redirect::route('profile.edit')->with('status', 'profile-updated');
     }

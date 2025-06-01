@@ -7,6 +7,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasMany; // Ditambahkan untuk ecoPointActivityLogs
+use Clickbar\Magellan\Data\Geometries\Point; // Import Point dari Magellan
+use Illuminate\Database\Eloquent\Casts\Attribute;
+
 
 class Transaction extends Model
 {
@@ -29,13 +32,24 @@ class Transaction extends Model
         'buyer_id',
         'waste_variant_id',
         'store_id',
-        'logistics_id', // Nullable
+        'logistics_id',
         'quantity',
         'total_price',
         'status',
         'eco_points_earned',
         'payment_method',
-        'completed_at', // Nullable
+        'completed_at',
+        // Tambahkan kolom alamat pengiriman
+        'delivery_recipient_name',
+        'delivery_phone_number',
+        'delivery_address_detail',
+        'delivery_village',
+        'delivery_subdistrict',
+        'delivery_city_regency',
+        'delivery_province',
+        'delivery_postal_code',
+        'delivery_location', // Kolom PostGIS
+        'delivery_notes',
     ];
 
     /**
@@ -48,6 +62,7 @@ class Transaction extends Model
         'completed_at' => 'datetime',
         'eco_points_earned' => 'integer',
         'quantity' => 'integer',
+        'delivery_location' => Point::class, // Casting ke objek Point
     ];
 
     /**
@@ -117,6 +132,24 @@ class Transaction extends Model
     {
         // Menggunakan konstanta dari model EcoPointLog jika ada, atau string literal
         return $this->hasMany(EcoPointLog::class, 'reference_id')
-                    ->where('source_type', EcoPointLog::SOURCE_TRANSACTION); // atau ->where('source_type', 'transaction');
+            ->where('source_type', EcoPointLog::SOURCE_TRANSACTION); // atau ->where('source_type', 'transaction');
+    }
+
+    /**
+     * Accessor untuk mendapatkan alamat pengiriman lengkap sebagai string.
+     * Contoh penggunaan: $transaction->full_delivery_address
+     */
+    protected function fullDeliveryAddress(): Attribute
+    {
+        return Attribute::make(
+            get: fn() => trim(implode(', ', array_filter([
+                $this->delivery_address_detail,
+                $this->delivery_village,
+                $this->delivery_subdistrict,
+                $this->delivery_city_regency,
+                $this->delivery_province,
+                $this->delivery_postal_code,
+            ]))),
+        );
     }
 }

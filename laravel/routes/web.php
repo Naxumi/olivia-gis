@@ -9,6 +9,53 @@ use App\Http\Controllers\MarketplaceController;
 use App\Http\Controllers\TransactionController;
 use App\Models\Waste;
 use App\Models\Transaction;
+use App\Http\Controllers\LogisticsController; // Kita akan buat controller ini
+
+use App\Http\Controllers\Auth\AuthenticatedSessionController;
+
+// Rute untuk MENAMPILKAN form update lokasi
+Route::get('/dashboard/logistics/{logistics}/update-location', [LogisticsController::class, 'showUpdateLocationForm'])
+    ->middleware(['auth']) // Pastikan pengguna sudah login
+    ->name('logistics.updateLocationForm'); // Nama rute untuk menampilkan form
+
+// Rute untuk MEMPROSES SUBMIT form update lokasi (menggunakan method PATCH)
+Route::patch('/dashboard/logistics/{logistics}/update-location', [LogisticsController::class, 'updateLocation'])
+    ->middleware(['auth']) // Pastikan pengguna sudah login
+    ->name('logistics.updateLocationAction'); // Nama rute untuk aksi update dari form
+
+// Route::get('/dashboard/logistics/{logistics}/update-location-form', [LogisticsController::class, 'showUpdateLocationForm'])
+//     ->middleware(['auth']) // Atau middleware lain yang sesuai, misal ['auth', 'role:distributor']
+//     ->name('logistics.updateLocationForm');
+
+// // Rute untuk menampilkan form update lokasi logistik
+// Route::get('logistics/{logistics}/edit-location', [LogisticsController::class, 'showUpdateLocationForm'])
+//     ->middleware(['auth', 'verified']) // Pastikan user login dan email terverifikasi (opsional untuk verified)
+//     ->name('dashboard.logistics.editLocationForm');
+
+
+// Rute untuk menampilkan halaman detail logistik dan form update sederhana
+Route::get('/logistics/{logistics}/view', [LogisticsController::class, 'showLogisticsPage'])
+    ->name('logistics.showPage'); // Memberi nama pada rute
+
+// Rute untuk menangani submit form dari halaman tersebut
+Route::post('/logistics/{logistics}/request-update', [LogisticsController::class, 'handleFormRequest'])
+    ->name('logistics.handleForm'); // Memberi nama pada rute
+
+// Rute Login
+Route::post('/login', [AuthenticatedSessionController::class, 'store'])
+    ->middleware('guest') // Hanya bisa diakses oleh guest (pengguna yang belum login)
+    ->name('login'); // Nama rute opsional
+
+// Rute Logout
+Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])
+    ->middleware('auth') // Hanya bisa diakses oleh pengguna yang sudah login
+    ->name('logout'); // Nama rute opsional
+
+// Rute Register
+Route::post('/register', function () {
+    // Logika untuk menyimpan user baru
+    // Misalnya, menggunakan User::create() atau Auth::register()
+})->middleware('guest')->name('register.post'); // Hanya bisa diakses oleh guest
 
 Route::get('/', function () {
     return view('landing');
