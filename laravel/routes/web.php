@@ -144,3 +144,16 @@ Route::get('/test-transactions', function () {
 })->middleware('auth'); // Pastikan hanya user terautentikasi yang bisa akses
 
 require __DIR__ . '/auth.php';
+
+
+Route::get('/peta-interaktif', function () {
+    // Di sini Anda bisa mengambil data lokasi toko/barang dari database
+    // dan mengirimkannya ke view jika diperlukan untuk marker awal.
+    // Contoh: $lokasiToko = App\Models\Toko::all();
+    // return view('map-detail', ['lokasiToko' => $lokasiToko]);
+
+    return view('map-detail'); // Untuk sekarang, view statis dulu
+})->name('map.interactive'); // Beri nama route agar mudah dipanggil
+Route::get('/test-peta', function () {
+    return view('test-map');
+});
