@@ -14,10 +14,6 @@
 
 Aplikasi ini tidak hanya memfasilitasi transaksi jual-beli, tetapi juga mengintegrasikan sistem logistik dengan pelacakan langsung (live tracking), memberikan insentif berupa poin ramah lingkungan (Eco Points), dan menyediakan data analitik sederhana untuk mendukung keberlanjutan.
 
-**Tautan Penting:**
-* **Demo Aplikasi:** `soon`
-* **Video Demo (YouTube):** `soon`
-
 ## 2. Fitur Utama
 
 EcoBarter dibangun dengan serangkaian fitur yang dirancang untuk menjawab tantangan dalam tema "Sustainable Digital Solutions":
