@@ -29,6 +29,11 @@ jobs:
           cd laravel
           composer install --no-dev --optimize-autoloader
 
+      - name: Zip Laravel content
+        run: |
+          cd laravel
+          zip -r ../deploy.zip .
+
       - name: Azure Login (OIDC)
         uses: azure/login@v1
         with:
@@ -40,4 +45,4 @@ jobs:
         uses: azure/webapps-deploy@v2
         with:
           app-name: laravel-webgis
-          package: ./laravel
+          package: deploy.zip
