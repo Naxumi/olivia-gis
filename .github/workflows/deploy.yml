@@ -29,9 +29,16 @@ jobs:
           cd laravel
           composer install --no-dev --optimize-autoloader
 
-      - name: Zip Laravel content
+      - name: Prepare deployment folder
         run: |
-          cd laravel
+          mkdir deploy-folder
+          cp -r laravel/* deploy-folder/
+          cp -r laravel/.* deploy-folder/ || echo "No hidden files"
+          ls -la deploy-folder
+
+      - name: Zip deployment folder
+        run: |
+          cd deploy-folder
           zip -r ../deploy.zip .
 
       - name: Azure Login (OIDC)
