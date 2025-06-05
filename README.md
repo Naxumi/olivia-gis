@@ -6,6 +6,14 @@
 **Perguruan Tinggi:** Universitas Brawijaya
 **Tema:** Sustainable Digital Solutions: Enhancing Innovation through Web Technology
 
+## Anggota Tim
+
+* **Muhammad Hafizh Alfurqon** - 233140700111042 - (Peran dalam tim　： Backend Developer, GIS Specialist)
+* **Faiz Henri Kurniawan** - 233140700111048 - (Peran dalam tim　: Frontend Developer, Prompt Consultant)
+* **Talitha Rizqa Zayyanti** - 244140207111052 - (Peran dalam tim : Project Manager, Dokumentasi)
+
+**Dosen Pembimbing:** Rachmad Andri Atmoko, S.ST, M.T
+
 ---
 
 ## 1. Deskripsi Aplikasi
@@ -96,14 +104,6 @@ Repository ini bersifat *private*. Panitia akan diundang sebagai kolaborator. Un
         ```
 
 Aplikasi backend akan berjalan di `http://127.0.0.1:8000` dan frontend (tergantung setup Anda) mungkin berjalan di port lain.
-
-## 6. Anggota Tim
-
-* **Muhammad Hafizh Alfurqon** - 233140700111042 - (Peran dalam tim　： Backend Developer, GIS Specialist)
-* **Faiz Henri Kurniawan** - 233140700111048 - (Peran dalam tim　: Frontend Developer, Prompt Consultant)
-* **Talitha Rizqa Zayyanti** - 244140207111052 - (Peran dalam tim : Project Manager, Dokumentasi)
-
-**Dosen Pembimbing:** Rachmad Andri Atmoko, S.ST, M.T
 
 ---
 
