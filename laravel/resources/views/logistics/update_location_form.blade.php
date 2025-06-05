@@ -179,7 +179,7 @@
 
         @if ($logisticsItem->status === \App\Models\Logistics::STATUS_IN_TRANSIT)
             {{-- Menggunakan nama rute dari web.php jika Anda memindahkannya --}}
-            <form action="{{ route('logistics.updateLocationAction', ['logistics' => $logisticsItem->id]) }}"
+            <form action="{{ route('api.logistics.updateLocation', ['logistics' => $logisticsItem->id]) }}"
                 method="POST">
                 @csrf
                 @method('PATCH')

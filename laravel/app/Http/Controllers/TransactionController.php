@@ -40,6 +40,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 use Clickbar\Magellan\Data\Geometries\Point; // Import Point
+use Illuminate\Http\JsonResponse; // Add this import
 
 class TransactionController extends Controller
 {
@@ -402,15 +403,24 @@ class TransactionController extends Controller
         return response()->json($transaction->load(['buyer', 'seller', 'wasteVariant.waste.category', 'store', 'logistics.distributorUser', 'certificate', 'ecoPointLogs']));
         // Asumsi di model Logistics ada relasi distributorUser ke User model
     }
-
-    // Method untuk menampilkan daftar transaksi (misalnya untuk user tertentu)
-    public function index(Request $request)
+    /**
+     * Menampilkan daftar transaksi berdasarkan peran pengguna, dengan filter dan paginasi.
+     * GET /api/transactions
+     */
+    public function index(Request $request): JsonResponse
     {
+        /** @var \App\Models\User $user */
         $user = Auth::user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthenticated.'], 401);
+        }
+
+        // --- Membangun Query Dasar ---
         $query = Transaction::query();
 
+        // --- Menerapkan Filter berdasarkan peran (Authorization) ---
         if ($user->hasRole('admin')) {
-            // Admin bisa lihat semua
+            // Admin bisa lihat semua, tidak perlu filter tambahan berdasarkan user.
         } elseif ($user->hasRole('seller')) {
             $query->where('seller_id', $user->id);
         } elseif ($user->hasRole('buyer')) {
@@ -420,12 +430,45 @@ class TransactionController extends Controller
                 $q->where('distributor_id', $user->id);
             });
         } else {
-            return response()->json(['message' => 'Tidak ada transaksi untuk ditampilkan.'], 200); // Atau 403
+            // Untuk peran lain yang tidak seharusnya melihat transaksi, kembalikan array kosong.
+            return response()->json([]);
         }
 
-        $transactions = $query->with(['buyer:id,name', 'seller:id,name', 'wasteVariant:id,volume_in_grams', 'store:id,name'])
-            ->orderBy('created_at', 'desc')
-            ->paginate($request->get('per_page', 15));
+        // --- Menerapkan Filter Opsional dari Request ---
+        // Contoh: Filter berdasarkan status -> /api/transactions?status=pending
+        // Validasi status agar hanya salah satu dari daftar yang diizinkan
+        $allowedStatuses = [
+            'pending',
+            'confirmed',
+            'picked_up',
+            'delivered',
+            'cancelled'
+        ];
+        if ($request->filled('status')) {
+            $status = $request->input('status');
+            if (in_array($status, $allowedStatuses, true)) {
+                $query->where('status', $status);
+            } else {
+                return response()->json(['message' => 'Status tidak valid.'], 422);
+            }
+        }
+
+        // --- Menerapkan Sorting Opsional dari Request ---
+        // Contoh: Urutkan dari terlama -> /api/transactions?sort_direction=asc
+        $sortDirection = $request->input('sort_direction', 'desc'); // default 'desc' (terbaru)
+        if (!in_array($sortDirection, ['asc', 'desc'])) {
+            $sortDirection = 'desc'; // fallback jika input tidak valid
+        }
+        $query->orderBy('created_at', $sortDirection);
+
+
+        // --- Eager Loading dan Paginasi ---
+        $transactions = $query->with([
+            'buyer:id,name',
+            'seller:id,name',
+            'wasteVariant:id,volume_in_grams', // Sesuaikan kolom yang perlu ditampilkan
+            'store:id,name'
+        ])->paginate($request->input('per_page', 15)); // Menggunakan paginate
 
         return response()->json($transactions);
     }

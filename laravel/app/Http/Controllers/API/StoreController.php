@@ -14,15 +14,51 @@ use Clickbar\Magellan\Data\Geometries\Point; // Dari clickbar/laravel-magellan
 
 class StoreController extends Controller
 {
+    // /**
+    //  * Menampilkan daftar toko.
+    //  * GET /api/stores
+    //  */
+    // public function index(Request $request): JsonResponse
+    // {
+    //     /** @var \App\Models\User $user */
+    //     $user = Auth::user();
+    //     $itemsPerPage = $request->query('per_page', 10);
+
+    //     if (!$user) {
+    //         return response()->json(['message' => 'Unauthenticated.'], 401);
+    //     }
+
+    //     $query = Store::query()->with('user:id,name'); // Eager load pemilik toko
+
+    //     // Logika untuk menampilkan toko:
+    //     // Jika admin, tampilkan semua. Jika seller, tampilkan tokonya.
+    //     // Buyer mungkin bisa lihat semua (tergantung kebutuhan marketplace Anda).
+    //     if ($user->hasRole('admin')) {
+    //         // Admin melihat semua toko
+    //         $stores = $query->latest()->paginate($itemsPerPage);
+    //     } elseif ($user->hasRole('seller')) {
+    //         // Seller hanya melihat tokonya sendiri
+    //         $stores = $user->stores()->with('user:id,name')->latest()->paginate($itemsPerPage);
+    //     } elseif ($user->hasRole('buyer') || $user->hasRole('distributor')) {
+    //         // Buyer dan Distributor bisa melihat semua toko (untuk marketplace)
+    //         // Jika Anda ingin membatasi ini, tambahkan logika di sini.
+    //         $stores = $query->latest()->paginate($itemsPerPage);
+    //     } else {
+    //         // Untuk role lain atau jika tidak ada role yang cocok, kembalikan koleksi kosong atau error
+    //         return response()->json(['message' => 'Anda tidak memiliki akses untuk melihat daftar toko ini.'], 403);
+    //     }
+
+    //     return response()->json($stores);
+    // }
+
     /**
-     * Menampilkan daftar toko.
+     * Menampilkan daftar semua toko yang relevan.
      * GET /api/stores
      */
     public function index(Request $request): JsonResponse
     {
         /** @var \App\Models\User $user */
         $user = Auth::user();
-        $itemsPerPage = $request->query('per_page', 10);
 
         if (!$user) {
             return response()->json(['message' => 'Unauthenticated.'], 401);
@@ -32,20 +68,19 @@ class StoreController extends Controller
 
         // Logika untuk menampilkan toko:
         // Jika admin, tampilkan semua. Jika seller, tampilkan tokonya.
-        // Buyer mungkin bisa lihat semua (tergantung kebutuhan marketplace Anda).
+        // Buyer dan Distributor bisa melihat semua toko.
         if ($user->hasRole('admin')) {
             // Admin melihat semua toko
-            $stores = $query->latest()->paginate($itemsPerPage);
+            $stores = $query->latest()->get(); // Diubah dari paginate() menjadi get()
         } elseif ($user->hasRole('seller')) {
             // Seller hanya melihat tokonya sendiri
-            $stores = $user->stores()->with('user:id,name')->latest()->paginate($itemsPerPage);
+            $stores = $user->stores()->with('user:id,name')->latest()->get(); // Diubah dari paginate() menjadi get()
         } elseif ($user->hasRole('buyer') || $user->hasRole('distributor')) {
             // Buyer dan Distributor bisa melihat semua toko (untuk marketplace)
-            // Jika Anda ingin membatasi ini, tambahkan logika di sini.
-            $stores = $query->latest()->paginate($itemsPerPage);
+            $stores = $query->latest()->get(); // Diubah dari paginate() menjadi get()
         } else {
-            // Untuk role lain atau jika tidak ada role yang cocok, kembalikan koleksi kosong atau error
-            return response()->json(['message' => 'Anda tidak memiliki akses untuk melihat daftar toko ini.'], 403);
+            // Untuk role lain atau jika tidak ada role yang cocok, kembalikan koleksi kosong.
+            return response()->json([]); // Mengembalikan array kosong jika tidak ada akses
         }
 
         return response()->json($stores);
@@ -60,33 +95,30 @@ class StoreController extends Controller
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        if (!$user) {
-            return response()->json(['message' => 'Unauthenticated.'], 401);
-        }
-
-        // Hanya user dengan peran 'seller' yang boleh membuat toko
-        if (!$user->hasRole('seller')) {
+        if (!$user || !$user->hasRole('seller')) {
             return response()->json(['message' => 'Hanya seller yang dapat membuat toko.'], 403);
         }
 
         $validatedData = $request->validate([
             'name' => 'required|string|max:255',
-            'address' => 'required|string',
-            'location.latitude' => 'required|numeric|between:-90,90',
-            'location.longitude' => 'required|numeric|between:-180,180',
-            // Tambahkan validasi lain jika perlu
+            'address' => 'required|string|max:1000',
+            // Validasi untuk input latitude dan longitude terpisah
+            'latitude' => 'required|numeric|between:-90,90',
+            'longitude' => 'required|numeric|between:-180,180',
         ]);
 
         try {
+            // Buat objek Point dari Magellan
             $locationPoint = Point::makeGeodetic(
-                latitude: (float)$validatedData['location_latitude'],
-                longitude: (float)$validatedData['location_longitude']
+                latitude: (float)$validatedData['latitude'],
+                longitude: (float)$validatedData['longitude']
             );
 
+            // Simpan toko baru dengan objek Point
             $store = $user->stores()->create([
                 'name' => $validatedData['name'],
                 'address' => $validatedData['address'],
-                'location' => $locationPoint,
+                'location' => $locationPoint, // Menyimpan objek Point
             ]);
 
             return response()->json([
@@ -94,7 +126,7 @@ class StoreController extends Controller
                 'store' => $store->load('user:id,name')
             ], 201);
         } catch (\Exception $e) {
-            Log::error("Gagal membuat toko: " . $e->getMessage());
+            Log::error("Gagal membuat toko oleh user {$user->id}: " . $e->getMessage());
             return response()->json(['message' => 'Gagal membuat toko.', 'error' => $e->getMessage()], 500);
         }
     }
@@ -124,63 +156,60 @@ class StoreController extends Controller
         }
 
         // Eager load relasi yang mungkin dibutuhkan oleh SPA
-        $store->load(['user:id,name', 'wastes' /* , 'wastes.category', 'wastes.wasteVariants' */]);
+        $store->load(['user:id,name', 'wastes', 'wastes.category', 'wastes.wasteVariants']);
 
         return response()->json($store);
     }
 
     /**
-     * Memperbarui data toko yang sudah ada.
+     * Memperbarui data toko yang sudah ada. Hanya untuk pemilik atau Admin.
      * PUT/PATCH /api/stores/{store}
      */
     public function update(Request $request, Store $store): JsonResponse
     {
         /** @var \App\Models\User $user */
         $user = Auth::user();
-
         if (!$user) {
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
         // Otorisasi: Hanya pemilik toko atau admin yang bisa update
-        if (!($user->id === $store->user_id && $user->hasRole('seller')) && !$user->hasRole('admin')) {
+        if (!($user->id === $store->user_id || $user->hasRole('admin'))) {
             return response()->json(['message' => 'Anda tidak diizinkan untuk mengupdate toko ini.'], 403);
         }
 
         $validatedData = $request->validate([
             'name' => 'sometimes|required|string|max:255',
-            'address' => 'sometimes|required|string',
-            'location.latitude' => 'sometimes|required|numeric|between:-90,90',
-            'location.longitude' => 'sometimes|required|numeric|between:-180,180',
+            'address' => 'sometimes|required|string|max:1000',
+            'latitude' => 'sometimes|required|numeric|between:-90,90',
+            // Longitude wajib ada jika latitude dikirim
+            'longitude' => 'required_with:latitude|sometimes|numeric|between:-180,180',
         ]);
 
         try {
             $updateData = [];
-            if ($request->has('name')) {
-                $updateData['name'] = $validatedData['name'];
-            }
-            if ($request->has('address')) {
-                $updateData['address'] = $validatedData['address'];
-            }
-            if ($request->has('location') && isset($validatedData['location']['latitude']) && isset($validatedData['location']['longitude'])) {
+
+            // Tambahkan data non-lokasi ke array update
+            if ($request->has('name')) $updateData['name'] = $validatedData['name'];
+            if ($request->has('address')) $updateData['address'] = $validatedData['address'];
+
+            // Cek jika data lokasi dikirim, lalu buat objek Point
+            if (isset($validatedData['latitude']) && isset($validatedData['longitude'])) {
                 $updateData['location'] = Point::makeGeodetic(
-                    latitude: (float)$validatedData['location']['latitude'],
-                    longitude: (float)$validatedData['location']['longitude']
+                    latitude: (float)$validatedData['latitude'],
+                    longitude: (float)$validatedData['longitude']
                 );
             }
 
             if (empty($updateData)) {
-                return response()->json([
-                    'message' => 'Tidak ada data yang dikirim untuk diperbarui.',
-                    'store' => $store->load('user:id,name')
-                ]);
+                return response()->json(['message' => 'Tidak ada data valid yang dikirim untuk diperbarui.', 'store' => $store]);
             }
 
             $store->update($updateData);
 
             return response()->json([
                 'message' => 'Toko berhasil diperbarui!',
-                'store' => $store->fresh()->load('user:id,name')
+                'store' => $store->fresh()->load('user:id,name') // Ambil data terbaru
             ]);
         } catch (\Exception $e) {
             Log::error("Gagal update toko {$store->id}: " . $e->getMessage());

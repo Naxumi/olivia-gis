@@ -40,6 +40,10 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+        'sanctum' => [ // Pastikan entri ini ada
+            'driver' => 'sanctum',
+            'provider' => 'users', // Atau provider user Anda jika berbeda
+        ],
     ],
 
     /*

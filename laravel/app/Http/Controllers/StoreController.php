@@ -6,6 +6,9 @@ use App\Models\Store;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Clickbar\Magellan\Data\Geometries\Point; // Import Point dari Magellan
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Log;
 
 class StoreController extends Controller
 {
@@ -55,24 +58,48 @@ class StoreController extends Controller
     }
 
     /**
-     * Store a newly created resource in storage.
+     * Menyimpan toko baru. Hanya untuk Seller.
+     * POST /api/stores
      */
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
-        if (!Auth::user()->roles()->where('name', 'seller')->exists()) {
-            abort(403);
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        if (!$user || !$user->hasRole('seller')) {
+            return response()->json(['message' => 'Hanya seller yang dapat membuat toko.'], 403);
         }
 
-        $validated = $request->validate([
+        $validatedData = $request->validate([
             'name' => 'required|string|max:255',
-            'address' => 'required|string',
+            'address' => 'required|string|max:1000',
+            // Validasi untuk input latitude dan longitude terpisah
             'latitude' => 'required|numeric|between:-90,90',
             'longitude' => 'required|numeric|between:-180,180',
         ]);
 
-        Auth::user()->stores()->create($validated); // Langsung assign user_id
+        try {
+            // Buat objek Point dari Magellan
+            $locationPoint = Point::makeGeodetic(
+                latitude: (float)$validatedData['latitude'],
+                longitude: (float)$validatedData['longitude']
+            );
 
-        return redirect()->route('stores.index')->with('success', 'Toko berhasil dibuat!');
+            // Simpan toko baru dengan objek Point
+            $store = $user->stores()->create([
+                'name' => $validatedData['name'],
+                'address' => $validatedData['address'],
+                'location' => $locationPoint, // Menyimpan objek Point
+            ]);
+
+            return response()->json([
+                'message' => 'Toko berhasil dibuat!',
+                'store' => $store->load('user:id,name')
+            ], 201);
+        } catch (\Exception $e) {
+            Log::error("Gagal membuat toko oleh user {$user->id}: " . $e->getMessage());
+            return response()->json(['message' => 'Gagal membuat toko.', 'error' => $e->getMessage()], 500);
+        }
     }
 
     /**
@@ -103,27 +130,59 @@ class StoreController extends Controller
     }
 
     /**
-     * Update the specified resource in storage.
+     * Memperbarui data toko yang sudah ada. Hanya untuk pemilik atau Admin.
+     * PUT/PATCH /api/stores/{store}
      */
-    public function update(Request $request, Store $store)
+    public function update(Request $request, Store $store): JsonResponse
     {
-
-        if (Auth::id() !== $store->user_id) {
-            abort(403, 'Anda tidak diizinkan untuk mengupdate toko ini.');
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'address' => 'required|string',
-            'latitude' => 'required|numeric|between:-90,90',
-            'longitude' => 'required|numeric|between:-180,180',
+        // Otorisasi: Hanya pemilik toko atau admin yang bisa update
+        if (!($user->id === $store->user_id || $user->hasRole('admin'))) {
+            return response()->json(['message' => 'Anda tidak diizinkan untuk mengupdate toko ini.'], 403);
+        }
+
+        $validatedData = $request->validate([
+            'name' => 'sometimes|required|string|max:255',
+            'address' => 'sometimes|required|string|max:1000',
+            'latitude' => 'sometimes|required|numeric|between:-90,90',
+            // Longitude wajib ada jika latitude dikirim
+            'longitude' => 'required_with:latitude|sometimes|numeric|between:-180,180',
         ]);
 
-        $store->update($validated);
+        try {
+            $updateData = [];
 
-        return redirect()->route('stores.index')->with('success', 'Toko berhasil diperbarui!');
-        // Atau redirect ke stores.show:
-        // return redirect()->route('stores.show', $store->id)->with('success', 'Toko berhasil diperbarui!');
+            // Tambahkan data non-lokasi ke array update
+            if ($request->has('name')) $updateData['name'] = $validatedData['name'];
+            if ($request->has('address')) $updateData['address'] = $validatedData['address'];
+
+            // Cek jika data lokasi dikirim, lalu buat objek Point
+            if (isset($validatedData['latitude']) && isset($validatedData['longitude'])) {
+                $updateData['location'] = Point::makeGeodetic(
+                    latitude: (float)$validatedData['latitude'],
+                    longitude: (float)$validatedData['longitude']
+                );
+            }
+
+            if (empty($updateData)) {
+                return response()->json(['message' => 'Tidak ada data valid yang dikirim untuk diperbarui.', 'store' => $store]);
+            }
+
+            $store->update($updateData);
+
+            return response()->json([
+                'message' => 'Toko berhasil diperbarui!',
+                'store' => $store->fresh()->load('user:id,name') // Ambil data terbaru
+            ]);
+        } catch (\Exception $e) {
+            Log::error("Gagal update toko {$store->id}: " . $e->getMessage());
+            return response()->json(['message' => 'Gagal memperbarui toko.', 'error' => $e->getMessage()], 500);
+        }
     }
 
     /**

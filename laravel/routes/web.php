@@ -18,10 +18,10 @@ Route::get('/dashboard/logistics/{logistics}/update-location', [LogisticsControl
     ->middleware(['auth']) // Pastikan pengguna sudah login
     ->name('logistics.updateLocationForm'); // Nama rute untuk menampilkan form
 
-// Rute untuk MEMPROSES SUBMIT form update lokasi (menggunakan method PATCH)
-Route::patch('/dashboard/logistics/{logistics}/update-location', [LogisticsController::class, 'updateLocation'])
-    ->middleware(['auth']) // Pastikan pengguna sudah login
-    ->name('logistics.updateLocationAction'); // Nama rute untuk aksi update dari form
+// // Rute untuk MEMPROSES SUBMIT form update lokasi (menggunakan method PATCH)
+// Route::patch('/dashboard/logistics/{logistics}/update-location', [LogisticsController::class, 'updateLocation'])
+//     ->middleware(['auth']) // Pastikan pengguna sudah login
+//     ->name('logistics.updateLocationAction'); // Nama rute untuk aksi update dari form
 
 // Route::get('/dashboard/logistics/{logistics}/update-location-form', [LogisticsController::class, 'showUpdateLocationForm'])
 //     ->middleware(['auth']) // Atau middleware lain yang sesuai, misal ['auth', 'role:distributor']

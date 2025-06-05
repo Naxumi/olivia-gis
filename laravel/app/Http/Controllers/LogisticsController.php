@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Clickbar\Magellan\Database\PostgisFunctions\ST; // Magellan ST functions
+use Illuminate\Support\Facades\Http; // <-- Import Laravel HTTP Client
 
 class LogisticsController extends Controller
 {
@@ -45,14 +46,102 @@ class LogisticsController extends Controller
      * Endpoint untuk distributor mengupdate lokasi mereka.
      * PATCH /api/logistics/{logistics}/location
      */
+    // public function updateLocation(Request $request, Logistics $logistics)
+    // {
+    //     $distributor = Auth::user();
+    //     if (!$distributor->hasRole('distributor') || $logistics->distributor_id !== $distributor->id) {
+    //         return response()->json(['message' => 'Akses ditolak.'], 403);
+    //     }
+    //     if ($logistics->status !== Logistics::STATUS_IN_TRANSIT) {
+    //         return response()->json(['message' => 'Pengiriman tidak sedang berlangsung.'], 422);
+    //     }
+
+    //     $validated = $request->validate([
+    //         'current_latitude' => 'required|numeric|between:-90,90',
+    //         'current_longitude' => 'required|numeric|between:-180,180',
+    //     ]);
+
+    //     $currentLocationPoint = Point::makeGeodetic(
+    //         latitude: (float)$validated['current_latitude'],
+    //         longitude: (float)$validated['current_longitude']
+    //     );
+
+
+    //     $logistics->current_location = $currentLocationPoint;
+    //     $logistics->last_updated_at = Carbon::now();
+
+    //     $destinationPoint = $logistics->getDestinationCoordinates(); // Ini Point atau null
+    //     \Illuminate\Support\Facades\Log::info('Destination Point:', [$destinationPoint]); // Log ke storage/logs/laravel.log
+
+    //     if ($destinationPoint instanceof Point) {
+    //         // Menggunakan ST::distance dengan casting ke geography untuk akurasi meter
+    //         // $currentLocationForDb = ST::makePoint($currentLocationPoint->getLongitude(), $currentLocationPoint->getLatitude())->setSRID(4326);
+    //         // $destinationForDb = ST::makePoint($destinationPoint->getLongitude(), $destinationPoint->getLatitude())->setSRID(4326);
+
+    //         // Jika kolom sudah geography, casting tidak perlu, Magellan menangani Point object
+    //         $distanceMeters = DB::scalar(
+    //             "SELECT ST_Distance(?, ?)",
+    //             [$logistics->current_location, $destinationPoint]
+    //         );
+    //         \Illuminate\Support\Facades\Log::info('Calculated Distance (meters):', [$distanceMeters]);
+    //         // Untuk clickbar/magellan v2, parameter ke ST::distance harus berupa ekspresi atau nama kolom.
+    //         // Jika $currentLocationPoint dan $destinationPoint adalah objek Point dari Magellan:
+    //         // $distanceExpression = ST::distance(new \Clickbar\Magellan\Database\Expressions\AsGeography($logistics->current_location), new \Clickbar\Magellan\Database\Expressions\AsGeography($destinationPoint));
+    //         // $distanceMeters = Logistics::query()->select($distanceExpression->as('dist_meters'))->value('dist_meters');
+    //         // Atau jika ingin langsung nilai dari dua objek Point:
+    //         // $distanceMeters = $currentLocationPoint->distance($destinationPoint); // Cek apakah method distance() ada di Point Magellan dan support geography
+
+    //         // Untuk kepastian, menggunakan DB::raw atau select scalar dengan cast ke geography
+    //         // $distanceMeters = DB::selectOne(
+    //         //     "SELECT ST_Distance(?::geography, ?::geography) as distance_meters",
+    //         //     [$currentLocationPoint->toWKT(), $destinationPoint->toWKT()] // Kirim sebagai WKT
+    //         // )->distance_meters;
+    //         // Atau jika model sudah di-cast ke Point dan kolomnya geography, bisa langsung:
+    //         // $distanceMeters = DB::table(DB::raw('DUAL')) // atau select dari tabel dummy
+    //         //     ->select(ST::distance(
+    //         //         $logistics->current_location, // Ini sudah objek Point dari cast
+    //         //         $destinationPoint            // Ini juga objek Point
+    //         //     )->as('dist_meters'))->value('dist_meters');
+
+
+    //         if ($distanceMeters !== null) {
+    //             $logistics->distance_km = round($distanceMeters / 1000, 2);
+    //             $averageSpeedKmh = 30;
+    //             if ($logistics->distance_km > 0 && $averageSpeedKmh > 0) {
+    //                 $logistics->duration_minutes = round(($logistics->distance_km / $averageSpeedKmh) * 60);
+    //                 $logistics->estimated_delivery_time = Carbon::now()->addMinutes($logistics->duration_minutes);
+    //             } else {
+    //                 $logistics->duration_minutes = 0;
+    //                 $logistics->estimated_delivery_time = $logistics->last_updated_at;
+    //             }
+    //         }
+    //     }
+
+    //     $logistics->save();
+    //     return response()->json([
+    //         'message' => 'Lokasi dan estimasi berhasil diperbarui.',
+    //         'logistics' => $logistics,
+    //         'current' => $currentLocationPoint,
+    //         'current' => $currentLocationPoint,
+    //         'destination' => $destinationPoint,
+    //     ]);
+    // }
+
+    /**
+     * Endpoint untuk distributor mengupdate lokasi mereka.
+     * Memanggil OSRM untuk mendapatkan jarak dan durasi rute.
+     * PATCH /api/logistics/{logistics}/location
+     */
     public function updateLocation(Request $request, Logistics $logistics)
     {
         $distributor = Auth::user();
+
         if (!$distributor->hasRole('distributor') || $logistics->distributor_id !== $distributor->id) {
-            return response()->json(['message' => 'Akses ditolak.'], 403);
+            return response()->json(['message' => 'Akses ditolak. Anda bukan distributor yang ditugaskan.'], 403);
         }
+
         if ($logistics->status !== Logistics::STATUS_IN_TRANSIT) {
-            return response()->json(['message' => 'Pengiriman tidak sedang berlangsung.'], 422);
+            return response()->json(['message' => 'Pengiriman tidak sedang berlangsung atau sudah selesai/dibatalkan.'], 422);
         }
 
         $validated = $request->validate([
@@ -65,64 +154,55 @@ class LogisticsController extends Controller
             longitude: (float)$validated['current_longitude']
         );
 
-
         $logistics->current_location = $currentLocationPoint;
         $logistics->last_updated_at = Carbon::now();
 
-        $destinationPoint = $logistics->getDestinationCoordinates(); // Ini Point atau null
-        \Illuminate\Support\Facades\Log::info('Destination Point:', [$destinationPoint]); // Log ke storage/logs/laravel.log
+        $destinationPoint = $logistics->getDestinationCoordinates(); // Ambil Point tujuan dari model
 
         if ($destinationPoint instanceof Point) {
-            // Menggunakan ST::distance dengan casting ke geography untuk akurasi meter
-            // $currentLocationForDb = ST::makePoint($currentLocationPoint->getLongitude(), $currentLocationPoint->getLatitude())->setSRID(4326);
-            // $destinationForDb = ST::makePoint($destinationPoint->getLongitude(), $destinationPoint->getLatitude())->setSRID(4326);
+            $currentLng = $currentLocationPoint->getLongitude();
+            $currentLat = $currentLocationPoint->getLatitude();
+            $destLng = $destinationPoint->getLongitude();
+            $destLat = $destinationPoint->getLatitude();
 
-            // Jika kolom sudah geography, casting tidak perlu, Magellan menangani Point object
-            $distanceMeters = DB::scalar(
-                "SELECT ST_Distance(?, ?)",
-                [$logistics->current_location, $destinationPoint]
-            );
-            \Illuminate\Support\Facades\Log::info('Calculated Distance (meters):', [$distanceMeters]);
-            // Untuk clickbar/magellan v2, parameter ke ST::distance harus berupa ekspresi atau nama kolom.
-            // Jika $currentLocationPoint dan $destinationPoint adalah objek Point dari Magellan:
-            // $distanceExpression = ST::distance(new \Clickbar\Magellan\Database\Expressions\AsGeography($logistics->current_location), new \Clickbar\Magellan\Database\Expressions\AsGeography($destinationPoint));
-            // $distanceMeters = Logistics::query()->select($distanceExpression->as('dist_meters'))->value('dist_meters');
-            // Atau jika ingin langsung nilai dari dua objek Point:
-            // $distanceMeters = $currentLocationPoint->distance($destinationPoint); // Cek apakah method distance() ada di Point Magellan dan support geography
+            // Format URL OSRM: http://router.project-osrm.org/route/v1/driving/lon1,lat1;lon2,lat2?overview=false
+            $osrmUrl = "http://router.project-osrm.org/route/v1/driving/{$currentLng},{$currentLat};{$destLng},{$destLat}?overview=false&alternatives=false&steps=false";
 
-            // Untuk kepastian, menggunakan DB::raw atau select scalar dengan cast ke geography
-            // $distanceMeters = DB::selectOne(
-            //     "SELECT ST_Distance(?::geography, ?::geography) as distance_meters",
-            //     [$currentLocationPoint->toWKT(), $destinationPoint->toWKT()] // Kirim sebagai WKT
-            // )->distance_meters;
-            // Atau jika model sudah di-cast ke Point dan kolomnya geography, bisa langsung:
-            // $distanceMeters = DB::table(DB::raw('DUAL')) // atau select dari tabel dummy
-            //     ->select(ST::distance(
-            //         $logistics->current_location, // Ini sudah objek Point dari cast
-            //         $destinationPoint            // Ini juga objek Point
-            //     )->as('dist_meters'))->value('dist_meters');
+            try {
+                $response = Http::timeout(10)->get($osrmUrl); // Timeout 10 detik
 
+                if ($response->successful() && isset($response->json()['routes'][0])) {
+                    $route = $response->json()['routes'][0];
+                    $distanceMeters = $route['distance']; // Jarak dalam meter
+                    $durationSeconds = $route['duration']; // Durasi dalam detik
 
-            if ($distanceMeters !== null) {
-                $logistics->distance_km = round($distanceMeters / 1000, 2);
-                $averageSpeedKmh = 30;
-                if ($logistics->distance_km > 0 && $averageSpeedKmh > 0) {
-                    $logistics->duration_minutes = round(($logistics->distance_km / $averageSpeedKmh) * 60);
+                    $logistics->distance_km = round($distanceMeters / 1000, 2);
+                    $logistics->duration_minutes = round($durationSeconds / 60);
                     $logistics->estimated_delivery_time = Carbon::now()->addMinutes($logistics->duration_minutes);
                 } else {
-                    $logistics->duration_minutes = 0;
-                    $logistics->estimated_delivery_time = $logistics->last_updated_at;
+                    Log::warning("OSRM API request failed or no route found for logistics {$logistics->id}. Status: " . $response->status() . " Body: " . $response->body());
+                    // Biarkan nilai lama atau set null jika tidak ada rute
+                    // Untuk lomba, mungkin tidak masalah jika sesekali gagal & data estimasi tidak update
+                    // Jika ingin fallback ke Haversine:
+                    // $logistics->distance_km = $this->calculateHaversineDistance(...);
+                    // $logistics->duration_minutes = round(...);
+                    // $logistics->estimated_delivery_time = Carbon::now()->addMinutes($logistics->duration_minutes);
                 }
+            } catch (\Illuminate\Http\Client\ConnectionException $e) {
+                Log::error("OSRM API connection error for logistics {$logistics->id}: " . $e->getMessage());
+                // Tangani error koneksi, mungkin biarkan nilai estimasi lama
+            } catch (\Exception $e) {
+                Log::error("General error calling OSRM API for logistics {$logistics->id}: " . $e->getMessage());
             }
         }
 
         $logistics->save();
+
+        // event(new \App\Events\DistributorLocationUpdated($logistics));
+
         return response()->json([
             'message' => 'Lokasi dan estimasi berhasil diperbarui.',
-            'logistics' => $logistics,
-            'current' => $currentLocationPoint,
-            'current' => $currentLocationPoint,
-            'destination' => $destinationPoint,
+            'logistics' => $logistics->fresh()->load('distributorUser:id,name')
         ]);
     }
 
