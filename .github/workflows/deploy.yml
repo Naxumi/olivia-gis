@@ -1,16 +1,20 @@
-name: Deploy Laravel (in subfolder) to Azure
+name: Deploy Laravel to Azure
 
 on:
   push:
     branches:
       - main
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Set up PHP
@@ -18,23 +22,34 @@ jobs:
         with:
           php-version: '8.2'
           extensions: mbstring, bcmath, pdo, pdo_pgsql
+          tools: composer
 
-      - name: Install Composer Dependencies
+      - name: Install dependencies
         run: |
           cd laravel
           composer install --no-dev --optimize-autoloader
 
-      - name: Generate Laravel Key (optional)
+      - name: Prepare deployment folder
         run: |
-          cd laravel
-          php artisan config:clear
-          php artisan key:generate
-        env:
-          APP_KEY: ${{ secrets.APP_KEY }}
+          mkdir deploy-folder
+          cp -r laravel/* deploy-folder/
+          cp -r laravel/.* deploy-folder/ || echo "No hidden files"
+          ls -la deploy-folder
 
-      - name: Deploy to Azure Web App
+      - name: Zip deployment folder
+        run: |
+          cd deploy-folder
+          zip -r ../deploy.zip .
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy Laravel to Azure App Service
         uses: azure/webapps-deploy@v2
         with:
           app-name: laravel-webgis
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: ./laravel
+          package: deploy.zip
