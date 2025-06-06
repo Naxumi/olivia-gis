@@ -42,6 +42,7 @@ use Carbon\Carbon;
 use Clickbar\Magellan\Data\Geometries\Point; // Import Point
 use Illuminate\Http\JsonResponse; // Add this import
 
+
 class TransactionController extends Controller
 {
     /**

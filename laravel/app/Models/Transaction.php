@@ -10,7 +10,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany; // Ditambahkan untuk ecoPoin
 use Clickbar\Magellan\Data\Geometries\Point; // Import Point dari Magellan
 use Illuminate\Database\Eloquent\Casts\Attribute;
 
-
 class Transaction extends Model
 {
     use HasFactory;
@@ -151,5 +150,14 @@ class Transaction extends Model
                 $this->delivery_postal_code,
             ]))),
         );
+    }
+
+    /**
+     * Mendapatkan ulasan untuk transaksi ini (jika ada).
+     * Relasi ini adalah HasOne, karena satu transaksi hanya bisa punya satu ulasan.
+     */
+    public function review(): HasOne // <-- Pastikan method ini ada dan bernama 'review' (tunggal)
+    {
+        return $this->hasOne(Review::class);
     }
 }

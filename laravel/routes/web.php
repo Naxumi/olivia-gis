@@ -98,34 +98,33 @@ Route::get('/recycling-facilities', [RecyclingFacilityController::class, 'index'
 Route::get('/recycling-facilities/{recyclingFacility}', [RecyclingFacilityController::class, 'show'])->name('api.recycling-facilities.show');
 
 Route::controller(TransactionController::class)->prefix('transactions')->as('api.transactions.')->group(function () {
-        Route::get('/', 'index')->name('index'); // Daftar transaksi (sesuai peran)
-        Route::post('/', 'store')->name('store'); // Membuat transaksi baru (oleh Buyer)
-        Route::get('/{transaction}', 'show')->name('show'); // Melihat detail transaksi
+    Route::get('/', 'index')->name('index'); // Daftar transaksi (sesuai peran)
+    Route::post('/', 'store')->name('store'); // Membuat transaksi baru (oleh Buyer)
+    Route::get('/{transaction}', 'show')->name('show'); // Melihat detail transaksi
 
-        // Rute untuk mengubah status transaksi
-        Route::patch('/{transaction}/confirm-by-seller', 'confirmBySeller')->name('confirm_by_seller'); // Oleh Seller/Admin
-        Route::patch('/{transaction}/pickup-by-distributor', 'markAsPickedUpByDistributor')->name('pickup_by_distributor'); // Oleh Distributor
-        Route::patch('/{transaction}/deliver-by-distributor', 'markAsDeliveredByDistributor')->name('deliver_by_distributor'); // Oleh Distributor
-        Route::patch('/{transaction}/cancel', 'cancel')->name('cancel'); // Oleh Buyer/Seller/Admin
-    });
+    // Rute untuk mengubah status transaksi
+    Route::patch('/{transaction}/confirm-by-seller', 'confirmBySeller')->name('confirm_by_seller'); // Oleh Seller/Admin
+    Route::patch('/{transaction}/pickup-by-distributor', 'markAsPickedUpByDistributor')->name('pickup_by_distributor'); // Oleh Distributor
+    Route::patch('/{transaction}/deliver-by-distributor', 'markAsDeliveredByDistributor')->name('deliver_by_distributor'); // Oleh Distributor
+    Route::patch('/{transaction}/cancel', 'cancel')->name('cancel'); // Oleh Buyer/Seller/Admin
+});
 
- Route::controller(LogisticsController::class)->prefix('logistics')->as('api.logistics.')->group(function () {
-        // Endpoint untuk distributor mengirimkan update lokasi mereka.
-        Route::patch('/{logistics}/location', 'updateLocation')->name('updateLocation');
+Route::controller(LogisticsController::class)->prefix('logistics')->as('api.logistics.')->group(function () {
+    // Endpoint untuk distributor mengirimkan update lokasi mereka.
+    Route::patch('/{logistics}/location', 'updateLocation')->name('updateLocation');
 
-        // Endpoint untuk buyer/seller melihat status dan posisi terakhir pengiriman.
-        Route::get('/{logistics}/status', 'getLogisticsStatus')->name('getStatus');
-    });
+    // Endpoint untuk buyer/seller melihat status dan posisi terakhir pengiriman.
+    Route::get('/{logistics}/status', 'getLogisticsStatus')->name('getStatus');
+});
 
- Route::get('/wastes/{waste}', [WasteController::class, 'show'])->name('api.wastes.show');
-    Route::post('/wastes/{waste}', [WasteController::class, 'update'])->name('api.wastes.update'); // Gunakan POST dengan _method=PATCH untuk upload file
-    Route::delete('/wastes/{waste}', [WasteController::class, 'destroy'])->name('api.wastes.destroy');
+Route::get('/wastes/{waste}', [WasteController::class, 'show'])->name('api.wastes.show');
+Route::post('/wastes/{waste}', [WasteController::class, 'update'])->name('api.wastes.update'); // Gunakan POST dengan _method=PATCH untuk upload file
+Route::delete('/wastes/{waste}', [WasteController::class, 'destroy'])->name('api.wastes.destroy');
 
-Route::middleware(['role:admin'])->group(function () {
-        // Anda bisa menggunakan pengecekan peran di middleware seperti 'role:admin' jika sudah di-setup
-        // dengan Spatie, atau biarkan pengecekan di dalam controller seperti contoh di atas.
-        Route::post('/recycling-facilities', [RecyclingFacilityController::class, 'store'])->name('api.recycling-facilities.store');
-        Route::put('/recycling-facilities/{recyclingFacility}', [RecyclingFacilityController::class, 'update'])->name('api.recycling-facilities.update'); // PUT untuk mengganti semua field
-        Route::patch('/recycling-facilities/{recyclingFacility}', [RecyclingFacilityController::class, 'update'])->name('api.recycling-facilities.update-partial'); // PATCH untuk update sebagian
-        Route::delete('/recycling-facilities/{recyclingFacility}', [RecyclingFacilityController::class, 'destroy'])->name('api.recycling-facilities.destroy');
-    });
+
+// Anda bisa menggunakan pengecekan peran di middleware seperti 'role:admin' jika sudah di-setup
+// dengan Spatie, atau biarkan pengecekan di dalam controller seperti contoh di atas.
+Route::post('/recycling-facilities', [RecyclingFacilityController::class, 'store'])->name('api.recycling-facilities.store');
+Route::put('/recycling-facilities/{recyclingFacility}', [RecyclingFacilityController::class, 'update'])->name('api.recycling-facilities.update'); // PUT untuk mengganti semua field
+Route::patch('/recycling-facilities/{recyclingFacility}', [RecyclingFacilityController::class, 'update'])->name('api.recycling-facilities.update-partial'); // PATCH untuk update sebagian
+Route::delete('/recycling-facilities/{recyclingFacility}', [RecyclingFacilityController::class, 'destroy'])->name('api.recycling-facilities.destroy');

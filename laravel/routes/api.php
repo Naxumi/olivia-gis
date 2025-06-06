@@ -9,6 +9,7 @@ use App\Http\Controllers\API\WasteSearchController;
 use App\Http\Controllers\API\StoreController;
 use App\Http\Controllers\WasteController;
 use App\Http\Controllers\API\RecyclingFacilityController;
+use App\Http\Controllers\API\ReviewController;
 
 /*
 |--------------------------------------------------------------------------
@@ -45,7 +46,7 @@ Route::get('/recycling-facilities/{recyclingFacility}', [RecyclingFacilityContro
 // RUTE TERPROTEKSI (Wajib Login dengan Token Sanctum)
 //======================================================================
 
-// Route::middleware('auth:sanctum')->group(function () {
+Route::middleware('auth:sanctum')->group(function () {
 
     // --- Endpoint Pengguna ---
     // Mengambil data pengguna yang sedang terautentikasi.
@@ -60,7 +61,7 @@ Route::get('/recycling-facilities/{recyclingFacility}', [RecyclingFacilityContro
     // --- Endpoint Toko (Stores) ---
     // Menyediakan fungsi CRUD (Create, Read, Update, Delete) untuk toko.
     // Dikelola oleh pengguna dengan peran 'seller' atau 'admin'.
-//    Route::apiResource('stores', StoreController::class);
+    Route::apiResource('stores', StoreController::class);
 
 
     // --- Endpoint Transaksi (Transactions) ---
@@ -95,12 +96,15 @@ Route::get('/recycling-facilities/{recyclingFacility}', [RecyclingFacilityContro
     Route::delete('/wastes/{waste}', [WasteController::class, 'destroy'])->name('api.wastes.destroy');
 
     // Rute Terproteksi untuk Admin mengelola fasilitas
-    Route::middleware(['role:admin'])->group(function () {
-        // Anda bisa menggunakan pengecekan peran di middleware seperti 'role:admin' jika sudah di-setup
-        // dengan Spatie, atau biarkan pengecekan di dalam controller seperti contoh di atas.
-        Route::post('/recycling-facilities', [RecyclingFacilityController::class, 'store'])->name('api.recycling-facilities.store');
-        Route::put('/recycling-facilities/{recyclingFacility}', [RecyclingFacilityController::class, 'update'])->name('api.recycling-facilities.update'); // PUT untuk mengganti semua field
-        Route::patch('/recycling-facilities/{recyclingFacility}', [RecyclingFacilityController::class, 'update'])->name('api.recycling-facilities.update-partial'); // PATCH untuk update sebagian
-        Route::delete('/recycling-facilities/{recyclingFacility}', [RecyclingFacilityController::class, 'destroy'])->name('api.recycling-facilities.destroy');
-    });
-// });
+    Route::post('/recycling-facilities', [RecyclingFacilityController::class, 'store'])->name('api.recycling-facilities.store');
+    Route::put('/recycling-facilities/{recyclingFacility}', [RecyclingFacilityController::class, 'update'])->name('api.recycling-facilities.update'); // PUT untuk mengganti semua field
+    Route::patch('/recycling-facilities/{recyclingFacility}', [RecyclingFacilityController::class, 'update'])->name('api.recycling-facilities.update-partial'); // PATCH untuk update sebagian
+    Route::delete('/recycling-facilities/{recyclingFacility}', [RecyclingFacilityController::class, 'destroy'])->name('api.recycling-facilities.destroy');
+
+    /**
+     * Rute khusus untuk membuat review pada sebuah transaksi.
+     * Hanya bisa diakses oleh user yang sudah login.
+     */
+    Route::post('/transactions/{transaction}/reviews', [ReviewController::class, 'store'])
+        ->name('api.transactions.reviews.store');
+});
