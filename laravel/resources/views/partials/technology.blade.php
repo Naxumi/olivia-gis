@@ -74,7 +74,6 @@
                     </p>
                 </div>
             </div>
-<<<<<<< HEAD
             <div class="md:w-2/3 text-gray-700 dark:text-gray-300 space-y-4 text-base md:text-lg">
                 <p>
                     Platform Eco Barter dikembangkan menggunakan <strong class="font-semibold text-green-600 dark:text-green-400">Laravel 11</strong>,
@@ -93,7 +92,6 @@
                     <li class="flex items-center"><i class="fas fa-expand-arrows-alt text-green-500 dark:text-green-400 mr-2"></i>Skalabilitas untuk Pertumbuhan</li>
                     <li class="flex items-center"><i class="fas fa-code text-green-500 dark:text-green-400 mr-2"></i>Ekosistem Pengembangan Produktif</li>
                 </ul>
-=======
         </div>
 
         {{-- Teknologi Frontend --}}
@@ -126,7 +124,6 @@
                         Framework CSS utility-first untuk membangun antarmuka pengguna yang modern dan responsif dengan cepat dan konsisten.
                     </p>
                 </div>
->>>>>>> ace065146c264d92961123244be159f31feffe69
             </div>
         </div>
 
