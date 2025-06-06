@@ -2,10 +2,12 @@
 
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\StoreController;
 use App\Http\Controllers\WasteController;
 use App\Http\Controllers\WasteVariantController;
 use App\Http\Controllers\MarketplaceController;
+use App\Http\Controllers\API\StoreController;
+use App\Http\Controllers\API\WasteSearchController;
+use App\Http\Controllers\API\RecyclingFacilityController;
 use App\Http\Controllers\TransactionController;
 use App\Models\Waste;
 use App\Models\Transaction;
@@ -13,147 +15,117 @@ use App\Http\Controllers\LogisticsController; // Kita akan buat controller ini
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 
-// Rute untuk MENAMPILKAN form update lokasi
-Route::get('/dashboard/logistics/{logistics}/update-location', [LogisticsController::class, 'showUpdateLocationForm'])
-    ->middleware(['auth']) // Pastikan pengguna sudah login
-    ->name('logistics.updateLocationForm'); // Nama rute untuk menampilkan form
 
-// // Rute untuk MEMPROSES SUBMIT form update lokasi (menggunakan method PATCH)
-// Route::patch('/dashboard/logistics/{logistics}/update-location', [LogisticsController::class, 'updateLocation'])
-//     ->middleware(['auth']) // Pastikan pengguna sudah login
-//     ->name('logistics.updateLocationAction'); // Nama rute untuk aksi update dari form
+/*
+|--------------------------------------------------------------------------
+| Web Routes
+|--------------------------------------------------------------------------
+|
+| Di sini Anda mendaftarkan rute web untuk aplikasi Anda. Rute-rute ini
+| dimuat oleh RouteServiceProvider dalam grup yang berisi middleware 'web'
+| (sesi, proteksi CSRF, dll.). Cocok untuk aplikasi web tradisional.
+|
+*/
 
-// Route::get('/dashboard/logistics/{logistics}/update-location-form', [LogisticsController::class, 'showUpdateLocationForm'])
-//     ->middleware(['auth']) // Atau middleware lain yang sesuai, misal ['auth', 'role:distributor']
-//     ->name('logistics.updateLocationForm');
+//======================================================================
+// RUTE PUBLIK (Dapat Diakses oleh Siapa Saja/Tamu)
+//======================================================================
 
-// // Rute untuk menampilkan form update lokasi logistik
-// Route::get('logistics/{logistics}/edit-location', [LogisticsController::class, 'showUpdateLocationForm'])
-//     ->middleware(['auth', 'verified']) // Pastikan user login dan email terverifikasi (opsional untuk verified)
-//     ->name('dashboard.logistics.editLocationForm');
-
-
-// Rute untuk menampilkan halaman detail logistik dan form update sederhana
-Route::get('/logistics/{logistics}/view', [LogisticsController::class, 'showLogisticsPage'])
-    ->name('logistics.showPage'); // Memberi nama pada rute
-
-// Rute untuk menangani submit form dari halaman tersebut
-Route::post('/logistics/{logistics}/request-update', [LogisticsController::class, 'handleFormRequest'])
-    ->name('logistics.handleForm'); // Memberi nama pada rute
-
-// Rute Login
-Route::post('/login', [AuthenticatedSessionController::class, 'store'])
-    ->middleware('guest') // Hanya bisa diakses oleh guest (pengguna yang belum login)
-    ->name('login'); // Nama rute opsional
-
-// Rute Logout
-Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])
-    ->middleware('auth') // Hanya bisa diakses oleh pengguna yang sudah login
-    ->name('logout'); // Nama rute opsional
-
-// Rute Register
-Route::post('/register', function () {
-    // Logika untuk menyimpan user baru
-    // Misalnya, menggunakan User::create() atau Auth::register()
-})->middleware('guest')->name('register.post'); // Hanya bisa diakses oleh guest
-
+// Halaman utama / landing page
 Route::get('/', function () {
     return view('landing');
-});
+})->name('landing');
 
-Route::get('/dashboard', function () {
-    return view('dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
-
-Route::middleware('auth')->group(function () {
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-});
-
-Route::middleware(['auth'])->group(function () { // Pastikan user login
-    Route::resource('stores', StoreController::class);
-    // Anda perlu menambahkan middleware untuk cek role 'seller' di controller atau di sini
-});
-
-Route::middleware(['auth'])->group(function () {
-    Route::resource('stores.wastes', WasteController::class)->scoped(); // Jika waste terkait store
-    Route::resource('wastes.variants', WasteVariantController::class)->scoped(); // Jika variant terkait waste
-});
-
+// Halaman utama marketplace untuk melihat semua produk limbah
 Route::get('/marketplace', [MarketplaceController::class, 'index'])->name('marketplace.index');
 
-Route::middleware(['auth'])->group(function () {
-    Route::post('/transactions', [TransactionController::class, 'store'])->name('transactions.store');
-    Route::get('/transactions/{transaction}', [TransactionController::class, 'show'])->name('transactions.show');
-    // Tambahkan route lain untuk transaction index, update status, dll.
-});
-
-Route::middleware(['auth'])->group(function () {
-    Route::resource('stores', StoreController::class);
-    // Ini akan membuat route seperti /stores/{store}/wastes yang mengarah ke WasteController@index
-    Route::resource('stores.wastes', WasteController::class)->scoped([
-        // 'store' => 'username' // jika Anda ingin menggunakan kolom selain id untuk binding Store
-    ]);
-    // Anda juga perlu Route::resource untuk 'wastes.variants' jika ada
-    // Route::resource('wastes.variants', WasteVariantController::class)->scoped();
-});
-
-Route::middleware(['auth'])->group(function () {
-    // ... rute lainnya ...
-    Route::resource('wastes.variants', WasteVariantController::class)->scoped();
-    // Ini akan otomatis membuat rute untuk:
-    // GET    /wastes/{waste}/variants            (wastes.variants.index) -> WasteVariantController@index
-    // GET    /wastes/{waste}/variants/create     (wastes.variants.create) -> WasteVariantController@create
-    // POST   /wastes/{waste}/variants            (wastes.variants.store) -> WasteVariantController@store
-    // GET    /wastes/{waste}/variants/{variant}  (wastes.variants.show) -> WasteVariantController@show (jika diimplementasikan)
-    // GET    /wastes/{waste}/variants/{variant}/edit (wastes.variants.edit) -> WasteVariantController@edit
-    // PUT    /wastes/{waste}/variants/{variant}  (wastes.variants.update) -> WasteVariantController@update
-    // DELETE /wastes/{waste}/variants/{variant}  (wastes.variants.destroy) -> WasteVariantController@destroy (jika diimplementasikan)
-});
-
-Route::get('/waste-map', [WasteController::class, 'index'])->name('waste.index');
+// Rute untuk menampilkan peta publik
+Route::get('/peta-interaktif', function () {
+    // Anda bisa menambahkan logika untuk mengambil data lokasi toko awal di sini
+    return view('map-detail');
+})->name('map.interactive');
 
 
-Route::middleware('auth:sanctum')->group(function () { // Atau middleware 'auth' jika web
-    Route::post('/transactions', [TransactionController::class, 'store'])->name('transactions.store'); // Buyer
-    Route::patch('/transactions/{transaction}/confirm-by-seller', [TransactionController::class, 'confirmBySeller'])->name('transactions.confirm_by_seller'); // Seller atau Admin
-    Route::patch('/transactions/{transaction}/pickup-by-distributor', [TransactionController::class, 'markAsPickedUpByDistributor'])->name('transactions.pickup_by_distributor'); // Distributor
-    Route::patch('/transactions/{transaction}/deliver-by-distributor', [TransactionController::class, 'markAsDeliveredByDistributor'])->name('transactions.deliver_by_distributor'); // Distributor
-    Route::patch('/transactions/{transaction}/cancel', [TransactionController::class, 'cancel'])->name('transactions.cancel'); // Buyer/Seller/Admin
-
-    Route::get('/transactions/{transaction}', [TransactionController::class, 'show'])->name('transactions.show');
-    Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');
-});
-
-Route::get('/test-transactions', function () {
-    // Ambil beberapa data untuk diisi di form jika perlu, misal daftar waste variants, users, dll.
-    $waste_variants = \App\Models\WasteVariant::take(5)->get();
-    $users = \App\Models\User::take(5)->get(); // Terutama yang punya peran distributor
-    $transactions_pending = Transaction::where('status', Transaction::STATUS_PENDING)->take(5)->get();
-    $transactions_confirmed = Transaction::where('status', Transaction::STATUS_CONFIRMED)->take(5)->get();
-    $transactions_picked_up = Transaction::where('status', Transaction::STATUS_PICKED_UP)->take(5)->get();
-
-    return view('test_transactions', compact(
-        'waste_variants',
-        'users',
-        'transactions_pending',
-        'transactions_confirmed',
-        'transactions_picked_up'
-    ));
-})->middleware('auth'); // Pastikan hanya user terautentikasi yang bisa akses
-
+//======================================================================
+// RUTE AUTENTIKASI (Login, Register, dll.)
+//======================================================================
+// File auth.php (dibuat oleh Laravel Breeze/UI) biasanya sudah menangani
+// rute untuk login, register, forgot password, dll.
+// Pastikan baris ini ada di bagian akhir file.
 require __DIR__ . '/auth.php';
 
 
-Route::get('/peta-interaktif', function () {
-    // Di sini Anda bisa mengambil data lokasi toko/barang dari database
-    // dan mengirimkannya ke view jika diperlukan untuk marker awal.
-    // Contoh: $lokasiToko = App\Models\Toko::all();
-    // return view('map-detail', ['lokasiToko' => $lokasiToko]);
+//======================================================================
+// RUTE TERPROTEKSI (Wajib Login)
+//======================================================================
 
-    return view('map-detail'); // Untuk sekarang, view statis dulu
-})->name('map.interactive'); // Beri nama route agar mudah dipanggil
-Route::get('/test-peta', function () {
-    return view('test-map');
+Route::middleware(['auth', 'verified'])->group(function () { // 'verified' untuk memastikan email sudah terverifikasi
+
+    // --- Dashboard ---
+    Route::get('/dashboard', function () {
+        return view('dashboard');
+    })->name('dashboard');
+
+    // --- Profil Pengguna ---
+    Route::controller(ProfileController::class)->prefix('profile')->as('profile.')->group(function () {
+        Route::get('/', 'edit')->name('edit');
+        Route::patch('/', 'update')->name('update');
+        Route::delete('/', 'destroy')->name('destroy');
+    });
+
+    // Rute bersarang untuk Wastes yang dimiliki oleh Store.
+    // URL akan menjadi: /stores/{store}/wastes, /stores/{store}/wastes/{waste}, dll.
+    Route::resource('stores.wastes', WasteController::class)->scoped();
+    Route::apiResource('stores', StoreController::class);
+
+
+    // Rute bersarang untuk Waste Variants yang dimiliki oleh Waste.
+    // URL akan menjadi: /wastes/{waste}/variants, /wastes/{waste}/variants/{variant}, dll.
+    Route::resource('wastes.variants', WasteVariantController::class)->scoped();
+
+    // --- Halaman Debug/Testing (Hanya untuk Development) ---
+    // Sebaiknya diproteksi lebih lanjut atau dihapus saat produksi.
+    Route::get('/test-peta', function () {
+        return view('test-map');
+    })->name('test.map');
 });
+
+
+Route::get('/wastes/search', [WasteSearchController::class, 'search'])->name('api.wastes.search');
+
+// Rute Publik untuk melihat daftar dan detail fasilitas
+Route::get('/recycling-facilities', [RecyclingFacilityController::class, 'index'])->name('api.recycling-facilities.index');
+Route::get('/recycling-facilities/{recyclingFacility}', [RecyclingFacilityController::class, 'show'])->name('api.recycling-facilities.show');
+
+Route::controller(TransactionController::class)->prefix('transactions')->as('api.transactions.')->group(function () {
+        Route::get('/', 'index')->name('index'); // Daftar transaksi (sesuai peran)
+        Route::post('/', 'store')->name('store'); // Membuat transaksi baru (oleh Buyer)
+        Route::get('/{transaction}', 'show')->name('show'); // Melihat detail transaksi
+
+        // Rute untuk mengubah status transaksi
+        Route::patch('/{transaction}/confirm-by-seller', 'confirmBySeller')->name('confirm_by_seller'); // Oleh Seller/Admin
+        Route::patch('/{transaction}/pickup-by-distributor', 'markAsPickedUpByDistributor')->name('pickup_by_distributor'); // Oleh Distributor
+        Route::patch('/{transaction}/deliver-by-distributor', 'markAsDeliveredByDistributor')->name('deliver_by_distributor'); // Oleh Distributor
+        Route::patch('/{transaction}/cancel', 'cancel')->name('cancel'); // Oleh Buyer/Seller/Admin
+    });
+
+ Route::controller(LogisticsController::class)->prefix('logistics')->as('api.logistics.')->group(function () {
+        // Endpoint untuk distributor mengirimkan update lokasi mereka.
+        Route::patch('/{logistics}/location', 'updateLocation')->name('updateLocation');
+
+        // Endpoint untuk buyer/seller melihat status dan posisi terakhir pengiriman.
+        Route::get('/{logistics}/status', 'getLogisticsStatus')->name('getStatus');
+    });
+
+ Route::get('/wastes/{waste}', [WasteController::class, 'show'])->name('api.wastes.show');
+    Route::post('/wastes/{waste}', [WasteController::class, 'update'])->name('api.wastes.update'); // Gunakan POST dengan _method=PATCH untuk upload file
+    Route::delete('/wastes/{waste}', [WasteController::class, 'destroy'])->name('api.wastes.destroy');
+
+Route::middleware(['role:admin'])->group(function () {
+        // Anda bisa menggunakan pengecekan peran di middleware seperti 'role:admin' jika sudah di-setup
+        // dengan Spatie, atau biarkan pengecekan di dalam controller seperti contoh di atas.
+        Route::post('/recycling-facilities', [RecyclingFacilityController::class, 'store'])->name('api.recycling-facilities.store');
+        Route::put('/recycling-facilities/{recyclingFacility}', [RecyclingFacilityController::class, 'update'])->name('api.recycling-facilities.update'); // PUT untuk mengganti semua field
+        Route::patch('/recycling-facilities/{recyclingFacility}', [RecyclingFacilityController::class, 'update'])->name('api.recycling-facilities.update-partial'); // PATCH untuk update sebagian
+        Route::delete('/recycling-facilities/{recyclingFacility}', [RecyclingFacilityController::class, 'destroy'])->name('api.recycling-facilities.destroy');
+    });

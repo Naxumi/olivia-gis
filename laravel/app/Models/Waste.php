@@ -14,6 +14,14 @@ class Waste extends Model
     // Asumsikan price & stock di sini adalah default atau agregat
     // status ENUM: ['available', 'sold', 'expired']
 
+    /**
+     * Relasi ke gambar-gambar limbah.
+     */
+    public function images(): HasMany
+    {
+        return $this->hasMany(WasteImage::class);
+    }
+
     public function store(): BelongsTo
     {
         return $this->belongsTo(Store::class); // Relasi ke Store, asumsikan Waste dimiliki oleh Store

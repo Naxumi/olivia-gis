@@ -11,6 +11,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB; // Jika perlu DB transaction
 use Clickbar\Magellan\Data\Geometries\Point; // Dari clickbar/laravel-magellan
+use Illuminate\Support\Facades\Storage; // Import Storage facade
+use Illuminate\Validation\Rules\File; // Import aturan validasi File
 
 class StoreController extends Controller
 {
@@ -87,7 +89,7 @@ class StoreController extends Controller
     }
 
     /**
-     * Menyimpan toko baru.
+     * Menyimpan toko baru dengan gambar.
      * POST /api/stores
      */
     public function store(Request $request): JsonResponse
@@ -102,24 +104,30 @@ class StoreController extends Controller
         $validatedData = $request->validate([
             'name' => 'required|string|max:255',
             'address' => 'required|string|max:1000',
-            // Validasi untuk input latitude dan longitude terpisah
             'latitude' => 'required|numeric|between:-90,90',
             'longitude' => 'required|numeric|between:-180,180',
+            // Validasi untuk file gambar
+            'image' => ['nullable', File::image()->max(2048)], // Opsional, gambar, maks 2MB
         ]);
 
         try {
-            // Buat objek Point dari Magellan
-            $locationPoint = Point::makeGeodetic(
-                latitude: (float)$validatedData['latitude'],
-                longitude: (float)$validatedData['longitude']
-            );
-
-            // Simpan toko baru dengan objek Point
-            $store = $user->stores()->create([
+            $storeData = [
                 'name' => $validatedData['name'],
                 'address' => $validatedData['address'],
-                'location' => $locationPoint, // Menyimpan objek Point
-            ]);
+                'location' => Point::makeGeodetic(
+                    latitude: (float)$validatedData['latitude'],
+                    longitude: (float)$validatedData['longitude']
+                ),
+            ];
+
+            // Proses upload gambar jika ada
+            if ($request->hasFile('image')) {
+                // Simpan file ke storage/app/public/store-images dan dapatkan path-nya
+                $path = $request->file('image')->store('store-images', 'public');
+                $storeData['image_path'] = $path;
+            }
+
+            $store = $user->stores()->create($storeData);
 
             return response()->json([
                 'message' => 'Toko berhasil dibuat!',
@@ -162,18 +170,18 @@ class StoreController extends Controller
     }
 
     /**
-     * Memperbarui data toko yang sudah ada. Hanya untuk pemilik atau Admin.
-     * PUT/PATCH /api/stores/{store}
+     * Memperbarui data toko yang sudah ada, termasuk gambar.
+     * PENTING: Untuk update file, request dari frontend harus menggunakan method POST
+     * dan menyertakan field _method dengan nilai 'PUT' atau 'PATCH' (form-data).
+     * Atau, buat endpoint terpisah khusus untuk update gambar.
+     *
+     * POST /api/stores/{store}  (dengan _method="PATCH" di body)
      */
     public function update(Request $request, Store $store): JsonResponse
     {
         /** @var \App\Models\User $user */
         $user = Auth::user();
-        if (!$user) {
-            return response()->json(['message' => 'Unauthenticated.'], 401);
-        }
 
-        // Otorisasi: Hanya pemilik toko atau admin yang bisa update
         if (!($user->id === $store->user_id || $user->hasRole('admin'))) {
             return response()->json(['message' => 'Anda tidak diizinkan untuk mengupdate toko ini.'], 403);
         }
@@ -182,18 +190,14 @@ class StoreController extends Controller
             'name' => 'sometimes|required|string|max:255',
             'address' => 'sometimes|required|string|max:1000',
             'latitude' => 'sometimes|required|numeric|between:-90,90',
-            // Longitude wajib ada jika latitude dikirim
             'longitude' => 'required_with:latitude|sometimes|numeric|between:-180,180',
+            'image' => ['nullable', File::image()->max(2048)],
         ]);
 
         try {
             $updateData = [];
-
-            // Tambahkan data non-lokasi ke array update
             if ($request->has('name')) $updateData['name'] = $validatedData['name'];
             if ($request->has('address')) $updateData['address'] = $validatedData['address'];
-
-            // Cek jika data lokasi dikirim, lalu buat objek Point
             if (isset($validatedData['latitude']) && isset($validatedData['longitude'])) {
                 $updateData['location'] = Point::makeGeodetic(
                     latitude: (float)$validatedData['latitude'],
@@ -201,15 +205,29 @@ class StoreController extends Controller
                 );
             }
 
+            // Proses upload gambar baru jika ada
+            if ($request->hasFile('image')) {
+                // Hapus gambar lama jika ada
+                if ($store->image_path) {
+                    Storage::disk('public')->delete($store->image_path);
+                }
+                // Simpan gambar baru
+                $path = $request->file('image')->store('store-images', 'public');
+                $updateData['image_path'] = $path;
+            }
+
             if (empty($updateData)) {
-                return response()->json(['message' => 'Tidak ada data valid yang dikirim untuk diperbarui.', 'store' => $store]);
+                return response()->json([
+                    'message' => 'Tidak ada data valid yang dikirim untuk diperbarui.',
+                    'store' => $store->load('user:id,name')
+                ]);
             }
 
             $store->update($updateData);
 
             return response()->json([
                 'message' => 'Toko berhasil diperbarui!',
-                'store' => $store->fresh()->load('user:id,name') // Ambil data terbaru
+                'store' => $store->fresh()->load('user:id,name')
             ]);
         } catch (\Exception $e) {
             Log::error("Gagal update toko {$store->id}: " . $e->getMessage());

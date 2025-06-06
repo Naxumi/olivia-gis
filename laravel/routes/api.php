@@ -2,75 +2,105 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\TransactionController; // Sesuaikan namespace jika Anda taruh di subfolder API
-use App\Http\Controllers\LogisticsController;   // Sesuaikan namespace
-use App\Http\Controllers\API\WasteSearchController; // Sesuaikan namespace jika perlu
+use App\Http\Controllers\TransactionController;
+use App\Http\Controllers\LogisticsController;
+use App\Http\Controllers\API\WasteSearchController;
 
-use App\Http\Controllers\API\StoreController; // Sesuaikan namespace jika perlu
+use App\Http\Controllers\API\StoreController;
+use App\Http\Controllers\WasteController;
+use App\Http\Controllers\API\RecyclingFacilityController;
 
 /*
 |--------------------------------------------------------------------------
 | API Routes
 |--------------------------------------------------------------------------
 |
-| Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "api" middleware group. Make something great!
+| Di sini Anda mendaftarkan rute API untuk aplikasi Anda. Semua rute
+| yang didefinisikan di sini akan otomatis memiliki prefix URL '/api/'.
 |
 */
 
-// Endpoint untuk login/autentikasi (Anda mungkin sudah punya atau perlu membuatnya)
-// Contoh: 
+//======================================================================
+// RUTE PUBLIK (Tidak Perlu Login)
+//======================================================================
 
-// Endpoint untuk pencarian limbah (publik)
+// Endpoint untuk pencarian limbah. Publik agar semua orang bisa melihat marketplace.
+Route::get('/wastes/search', [WasteSearchController::class, 'search'])->name('api.wastes.search');
 
-Route::middleware('auth:sanctum')->group(function () {
-    // Endpoint untuk mendapatkan data user yang sedang login
+// Rute Publik untuk melihat daftar dan detail fasilitas
+Route::get('/recycling-facilities', [RecyclingFacilityController::class, 'index'])->name('api.recycling-facilities.index');
+Route::get('/recycling-facilities/{recyclingFacility}', [RecyclingFacilityController::class, 'show'])->name('api.recycling-facilities.show');
+
+
+//======================================================================
+// RUTE AUTENTIKASI
+//======================================================================
+
+// Rute untuk login dan register tidak memerlukan middleware 'auth:sanctum'.
+// Route::post('/register', [AuthController::class, 'register'])->name('api.register');
+// Route::post('/login', [AuthController::class, 'login'])->name('api.login');
+
+
+//======================================================================
+// RUTE TERPROTEKSI (Wajib Login dengan Token Sanctum)
+//======================================================================
+
+// Route::middleware('auth:sanctum')->group(function () {
+
+    // --- Endpoint Pengguna ---
+    // Mengambil data pengguna yang sedang terautentikasi.
     Route::get('/user', function (Request $request) {
-        return $request->user()->load('roles'); // Contoh memuat peran user
+        return $request->user()->load('roles', 'distributorProfile'); // Muat info tambahan
+    });
+
+    // Endpoint untuk logout.
+    // Route::post('/logout', [AuthController::class, 'logout'])->name('api.logout');
+
+
+    // --- Endpoint Toko (Stores) ---
+    // Menyediakan fungsi CRUD (Create, Read, Update, Delete) untuk toko.
+    // Dikelola oleh pengguna dengan peran 'seller' atau 'admin'.
+//    Route::apiResource('stores', StoreController::class);
+
+
+    // --- Endpoint Transaksi (Transactions) ---
+    // Mengelola seluruh alur transaksi dari pemesanan hingga selesai.
+    Route::controller(TransactionController::class)->prefix('transactions')->as('api.transactions.')->group(function () {
+        Route::get('/', 'index')->name('index'); // Daftar transaksi (sesuai peran)
+        Route::post('/', 'store')->name('store'); // Membuat transaksi baru (oleh Buyer)
+        Route::get('/{transaction}', 'show')->name('show'); // Melihat detail transaksi
+
+        // Rute untuk mengubah status transaksi
+        Route::patch('/{transaction}/confirm-by-seller', 'confirmBySeller')->name('confirm_by_seller'); // Oleh Seller/Admin
+        Route::patch('/{transaction}/pickup-by-distributor', 'markAsPickedUpByDistributor')->name('pickup_by_distributor'); // Oleh Distributor
+        Route::patch('/{transaction}/deliver-by-distributor', 'markAsDeliveredByDistributor')->name('deliver_by_distributor'); // Oleh Distributor
+        Route::patch('/{transaction}/cancel', 'cancel')->name('cancel'); // Oleh Buyer/Seller/Admin
     });
 
 
-    Route::get('/wastes/search', [WasteSearchController::class, 'search'])
-        ->name('api.wastes.search');
+    // --- Endpoint Logistik (Logistics) ---
+    // Mengelola fitur live tracking untuk pengiriman.
+    Route::controller(LogisticsController::class)->prefix('logistics')->as('api.logistics.')->group(function () {
+        // Endpoint untuk distributor mengirimkan update lokasi mereka.
+        Route::patch('/{logistics}/location', 'updateLocation')->name('updateLocation');
 
-    
-    Route::patch('/logistics/{logistics}/location', [LogisticsController::class, 'updateLocation'])
-    ->name('api.logistics.updateLocation');
-    Route::get('/logistics/{logistics}/status', [LogisticsController::class, 'getLogisticsStatus'])
-    ->name('api.logistics.getStatus');
+        // Endpoint untuk buyer/seller melihat status dan posisi terakhir pengiriman.
+        Route::get('/{logistics}/status', 'getLogisticsStatus')->name('getStatus');
+    });
 
-    // Endpoint untuk Store (toko)
-    Route::apiResource('stores', StoreController::class);
+    // --- Endpoint Waste (Limbah) ---
+    // Mengelola data limbah yang dimiliki oleh toko.
+    Route::get('/wastes/{waste}', [WasteController::class, 'show'])->name('api.wastes.show');
+    Route::post('/wastes/{waste}', [WasteController::class, 'update'])->name('api.wastes.update'); // Gunakan POST dengan _method=PATCH untuk upload file
+    Route::delete('/wastes/{waste}', [WasteController::class, 'destroy'])->name('api.wastes.destroy');
 
-
-    // Endpoint untuk Transaksi (sesuaikan dengan nama rute yang Anda inginkan)
-    Route::get('/transactions/{transaction}', [TransactionController::class, 'show'])->name('api.transactions.show');
-    Route::get('/transactions', [TransactionController::class, 'index'])->name('api.transactions.index');
-    Route::post('/transactions', [TransactionController::class, 'store'])->name('api.transactions.store');
-    Route::patch('/transactions/{transaction}/confirm-by-seller', [TransactionController::class, 'confirmBySeller'])->name('api.transactions.confirm_by_seller');
-    Route::patch('/transactions/{transaction}/pickup-by-distributor', [TransactionController::class, 'markAsPickedUpByDistributor'])->name('api.transactions.pickup_by_distributor');
-    Route::patch('/transactions/{transaction}/deliver-by-distributor', [TransactionController::class, 'markAsDeliveredByDistributor'])->name('api.transactions.deliver_by_distributor');
-    Route::patch('/transactions/{transaction}/cancel', [TransactionController::class, 'cancel'])->name('api.transactions.cancel');
-
-    // Endpoint untuk Logistik
-    // Route::get('/dashboard/logistics/{logistics}/update-location', [LogisticsController::class, 'showUpdateLocationForm']) // Pastikan pengguna sudah login
-    //     ->name('api.logistics.updateLocationForm'); // Nama rute untuk menampilkan form
-
-
-
-
-    // Endpoint lain yang memerlukan autentikasi
-    // Misalnya, untuk StoreController jika ada API untuk itu
-    // Route::apiResource('stores', \App\Http\Controllers\API\StoreController::class);
-});
-
-// Route::middleware('auth:sanctum')->group(function () {
-//     Route::patch('/logistics/{logistics}/location', [LogisticsController::class, 'updateLocation'])
-//         ->name('api.logistics.updateLocation');
+    // Rute Terproteksi untuk Admin mengelola fasilitas
+    Route::middleware(['role:admin'])->group(function () {
+        // Anda bisa menggunakan pengecekan peran di middleware seperti 'role:admin' jika sudah di-setup
+        // dengan Spatie, atau biarkan pengecekan di dalam controller seperti contoh di atas.
+        Route::post('/recycling-facilities', [RecyclingFacilityController::class, 'store'])->name('api.recycling-facilities.store');
+        Route::put('/recycling-facilities/{recyclingFacility}', [RecyclingFacilityController::class, 'update'])->name('api.recycling-facilities.update'); // PUT untuk mengganti semua field
+        Route::patch('/recycling-facilities/{recyclingFacility}', [RecyclingFacilityController::class, 'update'])->name('api.recycling-facilities.update-partial'); // PATCH untuk update sebagian
+        Route::delete('/recycling-facilities/{recyclingFacility}', [RecyclingFacilityController::class, 'destroy'])->name('api.recycling-facilities.destroy');
+    });
 // });
-
-// Route::patch('/logistics/{logistics}/location', [LogisticsController::class, 'updateLocation'])
-//     ->middleware(['auth:sanctum'])
-//     ->name('api.logistics.updateLocation');
-

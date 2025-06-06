@@ -4,67 +4,38 @@ namespace App\Http\Controllers;
 
 use App\Models\Waste;
 use App\Models\Store;
-use App\Models\Category;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\View\View;
-use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
+use App\Http\Controllers\Controller;
+use App\Models\WasteImage;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rules\File;
 
 class WasteController extends Controller
 {
     /**
-     * Display a listing of the resource for a specific store.
-     *
-     * @param  \App\Models\Store  $store
-     * @return View
+     * Menampilkan daftar limbah dari sebuah toko.
+     * GET /api/stores/{store}/wastes
      */
-    // public function index(Store $store): View
-    // {
-    //     if (Auth::id() !== $store->user_id && Auth::user()->role !== 'admin') {
-    //         abort(403, 'Anda tidak diizinkan mengakses limbah toko ini.');
-    //     }
-
-    //     $wastes = $store->wastes()->with('category')->latest()->paginate(10);
-
-    //     return view('wastes.index', compact('store', 'wastes'));
-    // }
-
-    public function index()
+    public function index(Store $store): JsonResponse
     {
-        // Lokasi default peta, misalnya Jakarta
-
-        $defaultLocation = ['lat' => -7.969627238985353, 'lng' => 112.60008006587819];
-        return view('wastes.index', compact('defaultLocation'));
+        // Otorisasi: Siapa saja bisa melihat limbah di sebuah toko (untuk marketplace)
+        $wastes = $store->wastes()->with('images', 'category')->latest()->paginate(10);
+        return response()->json($wastes);
     }
 
     /**
-     * Show the form for creating a new resource for a specific store.
-     *
-     * @param  \App\Models\Store  $store
-     * @return View
+     * Menyimpan data limbah baru beserta gambarnya.
+     * POST /api/stores/{store}/wastes
      */
-    public function create(Store $store): View
+    public function store(Request $request, Store $store): JsonResponse
     {
-        if (Auth::id() !== $store->user_id && Auth::user()->role !== 'admin') {
-            abort(403, 'Anda tidak diizinkan menambah limbah untuk toko ini.');
-        }
-
-        $categories = Category::orderBy('name')->get();
-
-        return view('wastes.create', compact('store', 'categories'));
-    }
-
-    /**
-     * Store a newly created resource in storage.
-     *
-     * @param  Request  $request
-     * @param  Store  $store
-     * @return RedirectResponse
-     */
-    public function store(Request $request, Store $store): RedirectResponse
-    {
-        if (Auth::id() !== $store->user_id && Auth::user()->role !== 'admin') {
-            abort(403, 'Anda tidak diizinkan menambah limbah untuk toko ini.');
+        $user = Auth::user();
+        if ($user->id !== $store->user_id && !$user->hasRole('admin')) {
+            return response()->json(['message' => 'Anda tidak diizinkan menambah limbah untuk toko ini.'], 403);
         }
 
         $validatedData = $request->validate([
@@ -74,11 +45,132 @@ class WasteController extends Controller
             'status' => 'required|in:available,sold,expired',
             'price' => 'required|numeric|min:0',
             'description' => 'nullable|string',
+            'images' => 'nullable|array|max:5', // Izinkan maks 5 gambar sekaligus
+            'images.*' => ['required', File::image()->max(2048)], // Setiap file harus gambar, maks 2MB
         ]);
 
-        $store->wastes()->create($validatedData);
+        try {
+            DB::beginTransaction();
 
-        return redirect()->route('stores.wastes.index', $store->id)
-            ->with('success', 'Limbah berhasil ditambahkan ke toko ' . $store->name);
+            $waste = $store->wastes()->create([
+                'name' => $validatedData['name'],
+                'category_id' => $validatedData['category_id'],
+                'stock' => $validatedData['stock'],
+                'status' => $validatedData['status'],
+                'price' => $validatedData['price'],
+                'description' => $validatedData['description'],
+            ]);
+
+            if ($request->hasFile('images')) {
+                foreach ($request->file('images') as $imageFile) {
+                    $path = $imageFile->store('waste-images', 'public');
+                    $waste->images()->create(['path' => $path]);
+                }
+            }
+
+            DB::commit();
+            return response()->json([
+                'message' => 'Data limbah berhasil ditambahkan!',
+                'waste' => $waste->load('images')
+            ], 201);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Gagal menyimpan limbah: " . $e->getMessage());
+            return response()->json(['message' => 'Gagal menyimpan data limbah.', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Menampilkan detail satu data limbah.
+     * GET /api/wastes/{waste}
+     */
+    public function show(Waste $waste): JsonResponse
+    {
+        return response()->json($waste->load('images', 'category', 'store.user:id,name'));
+    }
+
+    /**
+     * Memperbarui data limbah.
+     * CATATAN: Untuk update file, request dari frontend harus POST dengan _method=PATCH
+     */
+    public function update(Request $request, Waste $waste): JsonResponse
+    {
+        $user = Auth::user();
+        if ($user->id !== $waste->store->user_id && !$user->hasRole('admin')) {
+            return response()->json(['message' => 'Anda tidak diizinkan mengubah data ini.'], 403);
+        }
+
+        $validatedData = $request->validate([
+            'name' => 'sometimes|required|string|max:255',
+            'category_id' => 'sometimes|required|exists:categories,id',
+            'stock' => 'sometimes|required|integer|min:0',
+            'status' => 'sometimes|required|in:available,sold,expired',
+            'price' => 'sometimes|required|numeric|min:0',
+            'description' => 'nullable|string',
+        ]);
+
+        try {
+            $waste->update($validatedData);
+            return response()->json([
+                'message' => 'Data limbah berhasil diperbarui!',
+                'waste' => $waste->fresh()->load('images')
+            ]);
+        } catch (\Exception $e) {
+            Log::error("Gagal update limbah {$waste->id}: " . $e->getMessage());
+            return response()->json(['message' => 'Gagal memperbarui data limbah.', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Menghapus data limbah beserta semua gambarnya.
+     * DELETE /api/wastes/{waste}
+     */
+    public function destroy(Waste $waste): JsonResponse
+    {
+        $user = Auth::user();
+        if ($user->id !== $waste->store->user_id && !$user->hasRole('admin')) {
+            return response()->json(['message' => 'Anda tidak diizinkan menghapus data ini.'], 403);
+        }
+
+        try {
+            DB::beginTransaction();
+            // Hapus semua file gambar dari storage
+            foreach ($waste->images as $image) {
+                Storage::disk('public')->delete($image->path);
+            }
+            // Hapus record dari database (record di waste_images akan terhapus otomatis karena onDelete('cascade'))
+            $waste->delete();
+            DB::commit();
+            return response()->json(['message' => 'Data limbah dan semua gambarnya berhasil dihapus!']);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Gagal menghapus limbah {$waste->id}: " . $e->getMessage());
+            return response()->json(['message' => 'Gagal menghapus data limbah.', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Menghapus satu gambar spesifik dari sebuah data limbah.
+     * DELETE /api/waste-images/{waste_image}
+     */
+    public function destroyImage(WasteImage $wasteImage): JsonResponse
+    {
+        $user = Auth::user();
+        $waste = $wasteImage->waste; // Dapatkan parent waste dari gambar
+
+        if ($user->id !== $waste->store->user_id && !$user->hasRole('admin')) {
+            return response()->json(['message' => 'Anda tidak diizinkan menghapus gambar ini.'], 403);
+        }
+
+        try {
+            // Hapus file dari storage
+            Storage::disk('public')->delete($wasteImage->path);
+            // Hapus record dari database
+            $wasteImage->delete();
+            return response()->json(['message' => 'Gambar berhasil dihapus.']);
+        } catch (\Exception $e) {
+            Log::error("Gagal menghapus gambar {$wasteImage->id}: " . $e->getMessage());
+            return response()->json(['message' => 'Gagal menghapus gambar.', 'error' => $e->getMessage()], 500);
+        }
     }
 }
