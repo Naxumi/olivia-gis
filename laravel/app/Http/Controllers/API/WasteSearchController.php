@@ -8,105 +8,91 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Clickbar\Magellan\Data\Geometries\Point;
+use Illuminate\Validation\ValidationException;
+use Throwable;
+
+// Impor kelas-kelas yang diperlukan dari Magellan
+use Clickbar\Magellan\Database\PostgisFunctions\ST;
+use Clickbar\Magellan\Database\Expressions\AsGeometry; // <-- PASTIKAN ANDA MENGIMPOR INI
 
 class WasteSearchController extends Controller
 {
-    /**
-     * Mencari produk limbah dengan berbagai filter dan opsi urutan.
-     * GET /api/wastes/search
-     */
     public function search(Request $request): JsonResponse
     {
-        // --- Validasi Input ---
-        $validated = $request->validate([
-            'q' => 'nullable|string|max:255', // Kata kunci pencarian nama waste
-            'category' => 'nullable|string|exists:categories,name', // Filter by category name
-            'status' => 'nullable|string|in:available,sold,expired', // Filter by status
-            'sort_by' => 'nullable|string|in:nearby,price_asc,rating_desc,sold_desc', // Opsi pengurutan
-            'latitude' => 'required_if:sort_by,nearby|nullable|numeric|between:-90,90', // Wajib jika sort by nearby
-            'longitude' => 'required_if:sort_by,nearby|nullable|numeric|between:-180,180', // Wajib jika sort by nearby
-        ]);
+        try {
+            // --- 1. Validasi Input ---
+            $validated = $request->validate([
+                'q' => 'nullable|string|max:255',
+                'category' => 'nullable|string',
+                'status' => 'nullable|string|in:available,sold,expired',
+                'sort_by' => 'nullable|string|in:nearby,price_asc,rating_desc,sold_desc',
+                'latitude' => 'required_if:sort_by,nearby|nullable|numeric|between:-90,90',
+                'longitude' => 'required_if:sort_by,nearby|nullable|numeric|between:-180,180',
+            ]);
 
-        // --- Membangun Query Dasar ---
-        $query = Waste::query();
+            // --- 2. Query Dasar ---
+            $query = Waste::query()
+                ->join('stores', 'wastes.store_id', '=', 'stores.id')
+                ->join('categories', 'wastes.category_id', '=', 'categories.id')
+                ->whereNotNull('stores.location');
 
-        // Join dengan tabel stores dan categories untuk filter dan data tambahan
-        $query->join('stores', 'wastes.store_id', '=', 'stores.id');
-        $query->join('categories', 'wastes.category_id', '=', 'categories.id');
+            // Subquery untuk rating
+            $reviewsSubQuery = DB::table('reviews')
+                ->select('store_id', DB::raw('AVG(rating) as average_rating'))
+                ->groupBy('store_id');
+            $query->leftJoinSub($reviewsSubQuery, 'reviews_avg', 'stores.id', '=', 'reviews_avg.store_id');
 
-        // Subquery untuk menghitung rata-rata rating per toko
-        $reviewsSubQuery = DB::table('reviews')
-            ->select('store_id', DB::raw('AVG(rating) as average_rating'))
-            ->groupBy('store_id');
-
-        // Left Join dengan subquery rating
-        $query->leftJoinSub($reviewsSubQuery, 'reviews_avg', function ($join) {
-            $join->on('stores.id', '=', 'reviews_avg.store_id');
-        });
-
-        // --- Memilih Kolom yang Akan Ditampilkan ---
-        $query->select(
-            'wastes.name as waste_name',
-            'wastes.stock',
-            'wastes.status',
-            'wastes.price',
-            'wastes.sold_count',
-            'stores.name as store_name',
-            'stores.location', // Kolom geography dari PostGIS
-            DB::raw('COALESCE(reviews_avg.average_rating, 0) as average_rating') // Jika tidak ada rating, tampilkan 0
-        );
-
-        // --- Menerapkan Filter ---
-
-        // Filter berdasarkan nama waste (query 'q')
-        if (!empty($validated['q'])) {
-            $query->where('wastes.name', 'ILIKE', '%' . $validated['q'] . '%'); // ILIKE untuk case-insensitive di PostgreSQL
-        }
-
-        // Filter berdasarkan nama kategori
-        if (!empty($validated['category'])) {
-            $query->where('categories.name', $validated['category']);
-        }
-
-        // Filter berdasarkan status
-        if (!empty($validated['status'])) {
-            $query->where('wastes.status', $validated['status']);
-        }
-        // Jika parameter 'status' tidak ada, semua status akan ditampilkan (default).
-
-        // --- Menerapkan Pengurutan (Sorting) ---
-
-        $sortBy = $validated['sort_by'] ?? null;
-
-        if ($sortBy === 'nearby') {
-            // Urutkan berdasarkan jarak terdekat dari lokasi pengguna
-            // Pastikan latitude dan longitude pengguna tersedia dari request
-            $userLocation = Point::makeGeodetic(
-                latitude: (float)$validated['latitude'],
-                longitude: (float)$validated['longitude']
+            // --- 3. Kolom Pilihan ---
+            $query->select(
+                'wastes.id as waste_id', 'wastes.name as waste_name', 'wastes.stock', 'wastes.status', 'wastes.price', 'wastes.sold_count',
+                'stores.id as store_id', 'stores.name as store_name',
+                
+                // --- PERBAIKAN UTAMA: GUNAKAN AsGeometry UNTUK CASTING ---
+                // Ini akan mengubah SQL menjadi ST_Y(("stores"."location")::geometry)
+                // yang akan diterima oleh PostgreSQL
+                ST::y(new AsGeometry('stores.location'))->as('latitude'),
+                ST::x(new AsGeometry('stores.location'))->as('longitude'),
+                
+                DB::raw('COALESCE(reviews_avg.average_rating, 0) as average_rating')
             );
 
-            // Menambahkan kolom virtual 'distance_km' ke query dan mengurutkannya
-            // Menggunakan ST_Distance dengan casting ke geography untuk hasil dalam meter
-            $query->selectRaw(
-                "ST_Distance(stores.location, ?::geography) / 1000 AS distance_km",
-                [$userLocation] // Laravel & Magellan akan menangani binding objek Point ini
-            )->orderBy('distance_km', 'asc');
+            // --- 4. Filter (sudah benar) ---
+            if (!empty($validated['q'])) {
+                $query->where('wastes.name', 'ILIKE', '%' . $validated['q'] . '%');
+            }
 
-        } elseif ($sortBy === 'price_asc') {
-            $query->orderBy('wastes.price', 'asc');
-        } elseif ($sortBy === 'rating_desc') {
-            $query->orderBy('average_rating', 'desc');
-        } elseif ($sortBy === 'sold_desc') {
-            $query->orderBy('wastes.sold_count', 'desc');
-        } else {
-            // Urutan default jika tidak ada parameter sort_by (misalnya, yang terbaru)
-            $query->latest('wastes.created_at');
+            // --- 5. Pengurutan (sudah benar) ---
+            $sortBy = $validated['sort_by'] ?? null;
+            if ($sortBy === 'nearby' && isset($validated['latitude'], $validated['longitude'])) {
+                $userLocation = Point::makeGeodetic(
+                    latitude: (float) $validated['latitude'],
+                    longitude: (float) $validated['longitude']
+                );
+                
+                // Scope ini akan bekerja dengan tipe geography, jadi tidak perlu diubah
+                 $query->withDistance('location', $userLocation, 'distance_km')
+                       ->orderByDistance('location', $userLocation, 'asc');
+
+            } elseif ($sortBy === 'price_asc') {
+                $query->orderBy('wastes.price', 'asc');
+            } elseif ($sortBy === 'rating_desc') {
+                $query->orderBy('average_rating', 'desc');
+            } elseif ($sortBy === 'sold_desc') {
+                $query->orderBy('wastes.sold_count', 'desc');
+            } else {
+                $query->latest('wastes.created_at');
+            }
+
+            // --- 6. Eksekusi & Respon ---
+            $results = $query->paginate(20)->appends($request->query());
+
+            return response()->json($results);
+
+        } catch (ValidationException $e) {
+            return response()->json(['message' => 'Input tidak valid.', 'errors' => $e->errors()], 422);
+        } catch (Throwable $th) {
+            report($th);
+            return response()->json(['message' => 'Terjadi kesalahan pada server. Silakan cek log untuk detail.', 'error' => $th->getMessage()], 500);
         }
-
-        // --- Eksekusi Query dan Kembalikan Hasil ---
-        $results = $query->get();
-
-        return response()->json($results);
     }
 }
