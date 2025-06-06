@@ -74,25 +74,6 @@
                     </p>
                 </div>
             </div>
-            <div class="md:w-2/3 text-gray-700 dark:text-gray-300 space-y-4 text-base md:text-lg">
-                <p>
-                    Platform Eco Barter dikembangkan menggunakan <strong class="font-semibold text-green-600 dark:text-green-400">Laravel 11</strong>,
-                    framework PHP modern yang terkenal akan performa, keamanan, dan skalabilitasnya.
-                    Kami memilih Laravel 11 karena struktur aplikasinya yang lebih ramping, peningkatan kinerja yang signifikan,
-                    serta fitur-fitur terbaru yang memungkinkan pengembangan yang lebih cepat dan efisien untuk platform pengelolaan sampah yang kompleks.
-                </p>
-                <p>
-                    Dengan Laravel 11, kami dapat membangun aplikasi web yang tidak hanya andal dan aman,
-                    tetapi juga siap untuk pengembangan dan penambahan fitur di masa depan (*future-proof*),
-                    memastikan platform kami tetap relevan dan kompetitif dalam mendukung ekonomi sirkular.
-                </p>
-                <ul class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 pt-2">
-                    <li class="flex items-center"><i class="fas fa-rocket text-green-500 dark:text-green-400 mr-2"></i>Performa Tinggi & Efisien</li>
-                    <li class="flex items-center"><i class="fas fa-shield-alt text-green-500 dark:text-green-400 mr-2"></i>Keamanan Bawaan yang Tangguh</li>
-                    <li class="flex items-center"><i class="fas fa-expand-arrows-alt text-green-500 dark:text-green-400 mr-2"></i>Skalabilitas untuk Pertumbuhan</li>
-                    <li class="flex items-center"><i class="fas fa-code text-green-500 dark:text-green-400 mr-2"></i>Ekosistem Pengembangan Produktif</li>
-                </ul>
-        </div>
 
         {{-- Teknologi Frontend --}}
         <div>
