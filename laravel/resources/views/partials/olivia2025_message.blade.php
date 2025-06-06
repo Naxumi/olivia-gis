@@ -11,7 +11,7 @@
         </h2>
         <div class="inline-block w-20 h-1 bg-yellow-400 rounded mb-8"></div>
         <p class="text-lg md:text-xl max-w-3xl mx-auto mb-6 leading-relaxed text-green-100 dark:text-green-200">
-            Kami percaya bahwa [Nama Platform Anda] adalah perwujudan nyata dari tema Olivia 2025,
+            Kami percaya bahwa Eco Barter adalah perwujudan nyata dari tema Olivia 2025,
             <strong class="font-semibold">"Unlocking the Wonders of Tomorrow: Bridging Innovation and Sustainability"</strong>.
         </p>
         <p class="text-base md:text-lg max-w-3xl mx-auto leading-relaxed text-green-100 dark:text-green-200">

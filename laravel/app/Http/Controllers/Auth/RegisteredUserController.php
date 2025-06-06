@@ -48,7 +48,7 @@ class RegisteredUserController extends Controller
             'postal_code' => ['nullable', 'string', 'max:10'],
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
-            'address_notes' => ['nullable', 'string'],
+            //'address_notes' => ['nullable', 'string'],
         ]);
 
         DB::beginTransaction();
@@ -74,7 +74,7 @@ class RegisteredUserController extends Controller
                 'province' => $validatedData['province'],
                 'postal_code' => $validatedData['postal_code'],
                 'location' => $locationPoint, // Simpan objek Point
-                'address_notes' => $validatedData['address_notes'],
+                //'address_notes' => $validatedData['address_notes'],
             ]);
 
             $user->roles()->attach($validatedData['role_id']);
@@ -82,7 +82,7 @@ class RegisteredUserController extends Controller
             Auth::login($user);
             DB::commit();
 
-            return redirect(route('dashboard', absolute: false));
+            return redirect(route('map.interactive', absolute: false));
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Registrasi gagal: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());

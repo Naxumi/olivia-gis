@@ -76,7 +76,7 @@ Route::middleware(['auth', 'verified'])->group(function () { // 'verified' untuk
     // Rute bersarang untuk Wastes yang dimiliki oleh Store.
     // URL akan menjadi: /stores/{store}/wastes, /stores/{store}/wastes/{waste}, dll.
     Route::resource('stores.wastes', WasteController::class)->scoped();
-    Route::apiResource('stores', StoreController::class);
+    Route::apiResource(name: 'stores', controller: StoreController::class);
 
 
     // Rute bersarang untuk Waste Variants yang dimiliki oleh Waste.

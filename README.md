@@ -9,10 +9,12 @@
 ## Anggota Tim
 
 * **Muhammad Hafizh Alfurqon** - 233140700111042 - (Peran dalam tim　： Backend Developer, GIS Specialist)
-* **Faiz Henri Kurniawan** - 233140700111048 - (Peran dalam tim　: Frontend Developer, Prompt Consultant)
+* **Faiz Henri Kurniawan** - 233140700111048 - (Peran dalam tim　: Frontend Developer, DevOps)
 * **Talitha Rizqa Zayyanti** - 244140207111052 - (Peran dalam tim : Project Manager, Dokumentasi)
 
 **Dosen Pembimbing:** Rachmad Andri Atmoko, S.ST, M.T
+
+Link : https://laravel-webgis-btgkadgpe9gwdndf.southeastasia-01.azurewebsites.net/
 
 ---
 

@@ -5,10 +5,10 @@
             Siap Mengoptimalkan Pengelolaan Sampah Industri Anda?
         </h2>
         <p class="text-gray-600 dark:text-gray-300 max-w-xl mx-auto mb-8 text-lg">
-            Hubungi kami untuk demo platform atau diskusi lebih lanjut bagaimana [Nama Platform Anda] dapat membantu industri Anda menjadi lebih efisien dan berkelanjutan.
+            Hubungi kami untuk demo platform atau diskusi lebih lanjut bagaimana Eco Barter dapat membantu industri Anda menjadi lebih efisien dan berkelanjutan.
         </p>
         <div class="space-y-4 sm:space-y-0 sm:flex sm:justify-center sm:space-x-4">
-            <a href="mailto:kontak@namaplatformanda.com"
+            <a href="mailto:faizhenrik86@gmail.com"
                class="inline-flex items-center justify-center bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-8 rounded-lg shadow-md hover:shadow-lg transition duration-300 text-lg w-full sm:w-auto">
                 <i class="fas fa-envelope mr-2"></i> Hubungi Tim Ahli Kami
             </a>

@@ -1,441 +1,532 @@
-<x-map-layout title="Peta & Info Pengelola Sampah (Floating Panel)">
+<!DOCTYPE html>
+<html lang="id" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Peta Interaktif - Eco Barter</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
     <style>
-        /* CSS ini sudah benar, tidak perlu diubah */
-        #mapContainer,
-        #mapContainer .leaflet-tile-pane {
-            filter: none !important;
-            -webkit-filter: none !important;
+        :root {
+            --brand-green: #22c55e;
+            /* Green-500 */
+            --brand-green-dark: #16a34a;
+            /* Green-600 */
+        }
+
+        body,
+        html {
+            font-family: 'Inter', system-ui, sans-serif;
+            overflow: hidden;
+        }
+
+        .leaflet-pane {
+            z-index: 10;
+        }
+
+        .leaflet-top,
+        .leaflet-bottom {
+            z-index: 20;
+        }
+
+        .leaflet-control-zoom {
+            border: 1px solid #e5e7eb !important;
+        }
+
+        /* Panel Utama */
+        #floating-panel {
+            --panel-width-desktop: 400px;
+            --panel-height-mobile: 75vh;
+            transform: translateX(calc(-1 * var(--panel-width-desktop)));
+            width: var(--panel-width-desktop);
+            z-index: 30;
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        #floating-panel.is-open {
+            transform: translateX(0);
+        }
+
+        /* Scrollbar Styling */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #4b5563;
+            border-radius: 3px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #6b7280;
+        }
+
+        /* Tab Logic */
+        .tab-pane {
+            display: none;
+        }
+
+        .tab-pane.active {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .tab-button.active {
+            border-color: var(--brand-green);
+            color: var(--brand-green);
+        }
+
+        .result-card.active {
+            background-color: #ecfdf5;
+            /* green-50 */
+        }
+
+        .dark .result-card.active {
+            background-color: #052e16;
+            /* green-950/50 */
+        }
+
+        /* Marker Kustom untuk Item Aktif */
+        .leaflet-marker-icon.active-marker {
+            filter: drop-shadow(0 0 8px var(--brand-green));
+        }
+
+        /* Pastikan style ini ada di dalam tag <style> di head Anda */
+        .modal-overlay.open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-overlay.open .modal-box {
+            transform: translateY(0);
+        }
+
+        @media (max-width: 767px) {
+            #floating-panel {
+                width: 100%;
+                height: var(--panel-height-mobile);
+                top: auto;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                transform: translateY(var(--panel-height-mobile));
+                border-top-left-radius: 1.5rem;
+                border-top-right-radius: 1.5rem;
+                box-shadow: 0 -10px 25px -5px rgba(0, 0, 0, 0.1), 0 -8px 10px -6px rgba(0, 0, 0, 0.1);
+            }
+
+            #floating-panel.is-open {
+                transform: translateY(0);
+            }
+        }
+
+        /* Tambahkan ini di dalam tag <style> Anda */
+        .accordion-item {
+            border-bottom: 1px solid #e5e7eb;
+            /* dark:border-gray-700 */
+        }
+
+        .dark .accordion-item {
+            border-color: #374151;
+        }
+
+        .accordion-header {
+            cursor: pointer;
+            padding: 1rem 1.5rem;
+            transition: background-color 0.2s ease;
+        }
+
+        .accordion-header:hover {
+            background-color: #f9fafb;
+            /* dark:bg-gray-800 */
+        }
+
+        .dark .accordion-header:hover {
+            background-color: #1f2937;
+        }
+
+        .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-in-out, padding 0.3s ease;
+            background-color: #f9fafb;
+            /* dark:bg-gray-800/50 */
+            padding: 0 1.5rem;
+        }
+
+        .dark .accordion-content {
+            background-color: #1f2937;
+        }
+
+        .accordion-content.open {
+            max-height: 1000px;
+            /* Cukup besar untuk menampung konten form */
+            padding: 1.5rem;
+        }
+
+        .accordion-header .icon {
+            transition: transform 0.3s ease;
+        }
+
+        .accordion-header.open .icon {
+            transform: rotate(180deg);
         }
     </style>
+</head>
 
-    {{-- Container Utama --}}
-    <div class="w-screen h-screen relative">
+<body class="bg-gray-100 dark:bg-gray-900">
 
-        {{-- Map Container (dengan perbaikan tanda kutip) --}}
-        <div id="mapContainer" class="w-full h-full bg-gray-300 dark:bg-gray-500">
-            {{-- Peta akan diinisialisasi di sini oleh Leaflet --}}
-        </div>
+    <div id="map-container" class="relative w-screen h-screen">
+        <div id="map" class="w-full h-full"></div>
 
-        {{-- Floating Side Panel --}}
-        <div id="sidePanel"
-            class="absolute top-3 left-3 bottom-3 z-[1000]
-                   w-full max-w-md sm:w-80 md:w-96
-                   bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm
-                   border border-gray-200 dark:border-gray-700 rounded-lg shadow-2xl
-                   flex flex-col
-                   transition-transform duration-300 ease-in-out
-                   -translate-x-[110%] sm:translate-x-0">
-
-            {{-- Header Panel --}}
-            <div
-                class="flex items-center justify-between p-3 sm:p-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
-                <h2 class="text-lg sm:text-xl font-bold text-gray-800 dark:text-white">Informasi Detail</h2>
-                <button id="closePanelButtonMobile"
-                    class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white sm:hidden">
-                    <i class="fas fa-times text-xl"></i>
-                </button>
-            </div>
-
-            {{-- Tab Buttons --}}
-            <div class="flex border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
-                <button data-tab-target="detailBarang"
-                    class="tab-button active flex-1 py-3 px-2 text-xs sm:text-sm text-center">
-                    <i class="fas fa-recycle mr-1"></i> Info Daur Ulang
-                </button>
-                <button data-tab-target="profilToko" class="tab-button flex-1 py-3 px-2 text-xs sm:text-sm text-center">
-                    <i class="fas fa-industry mr-1"></i> Profil Pengolah
-                </button>
-            </div>
-
-            {{-- Konten Tab (Scrollable) --}}
-            <div class="flex-grow overflow-y-auto custom-scrollbar p-3 sm:p-4 space-y-4">
-                {{-- Placeholder --}}
-                <div id="initialContent" class="text-center text-gray-500 pt-10">
-                    <i class="fas fa-map-marker-alt text-4xl mb-3"></i>
-                    <p>Klik marker di peta untuk melihat detail.</p>
+        <div id="floating-panel"
+            class="absolute top-0 left-0 h-full bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl shadow-2xl flex flex-col">
+            <header class="p-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+                <div class="flex justify-between items-center">
+                    <h1 class="text-xl font-extrabold text-green-600 dark:text-green-400">Eco Barter</h1>
+                    <button id="panel-close-btn"
+                        class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 md:hidden"
+                        aria-label="Tutup Panel">
+                        <i class="fa-solid fa-times text-gray-600 dark:text-gray-400"></i>
+                    </button>
                 </div>
-                {{-- Konten Dinamis --}}
-                <div id="detailBarang" class="tab-content hidden space-y-3"></div>
-                <div id="profilToko" class="tab-content hidden space-y-3"></div>
-            </div>
-        </div>
+                <nav class="mt-4 border-b border-gray-200 dark:border-gray-700">
+                    <div class="-mb-px flex space-x-6">
+                        <button class="tab-button py-3 px-1 border-b-2 font-semibold text-sm transition-colors"
+                            data-tab="search-pane">Cari</button>
+                        <button class="tab-button py-3 px-1 border-b-2 font-semibold text-sm transition-colors"
+                            data-tab="detail-pane" disabled>Detail</button>
+                        <button class="tab-button py-3 px-1 border-b-2 font-semibold text-sm transition-colors"
+                            data-tab="profile-pane">Profil</button>
+                    </div>
+                </nav>
+            </header>
 
-        {{-- Tombol Open Panel (Mobile) --}}
-        <button id="openPanelButton"
-            class="absolute top-3 left-3 z-[1001]
-                   sm:hidden p-2.5 bg-white dark:bg-gray-700 rounded-full shadow-lg text-green-600 dark:text-green-400">
-            <i class="fas fa-bars text-lg"></i>
-        </button>
-
-        {{-- Search Bar --}}
-        <div id="searchBarContainer"
-            class="absolute top-3 z-[1000]
-                   right-3 left-16 sm:left-[21.5rem] md:left-[25.5rem]
-                   transition-all duration-300 ease-in-out">
-            <div class="relative">
-                <input type="text" placeholder="Cari lokasi atau pengelola..."
-                    class="w-full p-2.5 pl-9 text-sm bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg focus:ring-green-500 focus:border-green-500 outline-none">
-                <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                    <i class="fas fa-search text-gray-400"></i>
+            <main class="flex-grow overflow-y-auto custom-scrollbar">
+                <div id="search-pane" class="tab-pane">
+                    <form id="search-form"
+                        class="p-4 space-y-4 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
+                        <input type="text" id="q" name="q" placeholder="Cari nama sampah..."
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white transition">
+                        <select id="sort_by" name="sort_by"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white transition">
+                            <option value="">Urutkan: Relevansi</option>
+                            <option value="nearby" disabled>Jarak Terdekat (aktifkan lokasi)</option>
+                            <option value="price_asc">Harga Termurah</option>
+                            <option value="rating_desc">Rating Tertinggi</option>
+                        </select>
+                    </form>
+                    <div id="results-meta" class="px-4 pt-3 text-sm text-gray-500 dark:text-gray-400"></div>
+                    <div id="search-results-list" class="divide-y divide-gray-200 dark:divide-gray-700"></div>
                 </div>
-            </div>
+
+                <div id="detail-pane" class="tab-pane"></div>
+
+                <div id="profile-pane" class="tab-pane">
+                    @auth
+                        <div class="w-full">
+                            <div class="accordion-item">
+                            </div>
+
+                            <div class="accordion-item">
+                            </div>
+
+                            @if (Auth::user()->hasRole('seller'))
+                                <div class="accordion-item">
+                                    <div class="accordion-header flex justify-between items-center">
+                                        <h3 class="font-semibold text-gray-800 dark:text-gray-200">Toko Saya</h3>
+                                        <i class="icon fa-solid fa-chevron-down text-gray-500"></i>
+                                    </div>
+                                    <div class="accordion-content">
+                                        {{-- Memuat Komponen Livewire Daftar Toko --}}
+                                        @livewire('user-stores')
+                                    </div>
+                                </div>
+                            @endif
+
+                            <div class="accordion-item">
+                            </div>
+
+                            <div class="p-6">
+                            </div>
+                        </div>
+                    @else
+                    @endauth
+                </div>
+            </main>
         </div>
 
-        {{-- Tombol Zoom Control --}}
-        <div class="absolute bottom-3 right-3 z-[1000] flex flex-col space-y-2">
-            <button id="zoomInButton"
-                class="bg-white dark:bg-gray-800 p-2.5 w-10 h-10 rounded-lg shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700">
-                <i class="fas fa-plus"></i>
+        <div class="absolute top-4 left-4 z-20 md:hidden">
+            <button id="panel-toggle-mobile"
+                class="w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center text-gray-800"
+                aria-label="Buka Panel">
+                <i class="fa-solid fa-bars"></i>
             </button>
-            <button id="zoomOutButton"
-                class="bg-white dark:bg-gray-800 p-2.5 w-10 h-10 rounded-lg shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700">
-                <i class="fas fa-minus"></i>
+        </div>
+        <div class="absolute bottom-4 right-4 z-20 space-y-3">
+            <button id="get-location-btn" title="Cari Lokasi Saya"
+                class="w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center text-gray-700 hover:bg-gray-100 transition">
+                <i class="fa-solid fa-location-crosshairs text-xl"></i>
+            </button>
+            <button id="recenter-map-btn" title="Pusatkan Peta ke Hasil"
+                class="w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center text-gray-700 hover:bg-gray-100 transition">
+                <i class="fa-solid fa-compress-arrows-alt text-xl"></i>
             </button>
         </div>
     </div>
 
-
-    {{-- 1. TOMBOL UNTUK MEMBUKA MODAL --}}
-    <div class="absolute top-3 right-20 z-[1001]">
-        @auth
-            <button onclick="openManageStoresModal()"
-                class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
-                <i class="fas fa-store mr-2"></i>
-                Manajemen Toko Saya
-            </button>
-        @endauth
-    </div>
-
-
-    {{-- 2. CONTAINER MODAL (Awalnya tersembunyi) --}}
-    <div id="modal-container"
-        class="fixed inset-0 bg-gray-900 bg-opacity-50 z-[2000] hidden items-center justify-center"
-        onclick="closeModal(event)">
-        <div id="modal-content"
-            class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-            {{-- Konten modal akan dimasukkan di sini oleh JavaScript --}}
+    {{-- [BARU] Struktur HTML untuk Modal Edit Profil --}}
+    <div id="profile-edit-modal"
+        class="modal-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 opacity-0 pointer-events-none z-50 transition-opacity duration-300">
+        <div
+            class="modal-box bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg transform -translate-y-5 transition-transform duration-300">
+            <header class="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                <h3 class="text-lg font-bold text-gray-900 dark:text-white">Edit Informasi Profil</h3>
+                <button id="profile-modal-close-btn" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
+                    <i class="fa-solid fa-times text-gray-600 dark:text-gray-400"></i>
+                </button>
+            </header>
+            <main id="profile-modal-content" class="p-6">
+                {{-- Konten form akan dimasukkan oleh JavaScript di sini --}}
+                <div class="text-center text-gray-500">Memuat form...</div>
+            </main>
         </div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // === State Aplikasi ===
+            let userLocation = null;
+            let currentResults = [];
+            let activeWasteId = null;
+            let debounceTimer;
 
-    {{-- PERBAIKAN: Hanya gunakan SATU @push('scripts') --}}
-    @push('scripts')
-        <script>
-            document.addEventListener('DOMContentLoaded', function() {
-                // --- Referensi Elemen ---
-                const mapContainer = document.getElementById('mapContainer');
-                const sidePanel = document.getElementById('sidePanel');
-                const openPanelButton = document.getElementById('openPanelButton');
-                const closePanelButtonMobile = document.getElementById('closePanelButtonMobile');
-                const searchBarContainer = document.getElementById('searchBarContainer');
-                let map = null;
+            // === Inisialisasi Peta ===
+            const leafletMap = L.map('map', {
+                zoomControl: true,
+                attributionControl: false
+            }).setView([-2.5, 118.0], 5);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; CARTO'
+            }).addTo(leafletMap);
+            const markersLayer = L.featureGroup().addTo(leafletMap);
 
-                // --- Data Contoh ---
-                const locations = {
-                    'A001': {
-                        lat: -6.175110,
-                        lng: 106.865036,
-                        profil: {
-                            nama: 'CV. Lestari Daur Ulang',
-                            alamat: 'Jl. Industri Hijau No. 8, Jakarta'
-                        },
-                        produk: [{
-                            id: 'POC001',
-                            nama: 'Pupuk Organik Cair Super',
-                            deskripsi: 'Dibuat dari limbah organik pilihan, menyuburkan tanaman secara alami.',
-                            harga: 'Rp 25.000 / botol',
-                            icon: 'fa-leaf text-green-500'
-                        }]
-                    },
-                    'B002': {
-                        lat: -7.946355,
-                        lng: 112.641556,
-                        profil: {
-                            nama: 'Bank Sampah Sawojajar',
-                            alamat: 'Jl. Danau Toba G1E18, Malang'
-                        },
-                        produk: [{
-                            id: 'KMP001',
-                            nama: 'Kerajinan Tangan Plastik',
-                            deskripsi: 'Aneka kerajinan unik dari daur ulang botol plastik.',
-                            harga: 'Mulai dari Rp 10.000',
-                            icon: 'fa-gem text-blue-500'
-                        }, {
-                            id: 'KMP002',
-                            nama: 'Tas Belanja Ecobag',
-                            deskripsi: 'Tas belanja kuat dan ramah lingkungan dari bahan daur ulang.',
-                            harga: 'Rp 15.000',
-                            icon: 'fa-shopping-bag text-yellow-500'
-                        }]
-                    }
-                };
+            // === DOM Elements ===
+            const panel = document.getElementById('floating-panel');
+            const mobilePanelToggle = document.getElementById('panel-toggle-mobile');
+            const panelCloseBtn = document.getElementById('panel-close-btn');
+            const searchForm = document.getElementById('search-form');
+            const resultsMeta = document.getElementById('results-meta');
+            const resultsList = document.getElementById('search-results-list');
+            const detailPane = document.getElementById('detail-pane');
+            const profilePane = document.getElementById('profile-pane');
+            const getLocationBtn = document.getElementById('get-location-btn');
+            const recenterMapBtn = document.getElementById('recenter-map-btn');
 
-                // --- Inisialisasi Peta ---
-                function initializeMap() {
-                    if (map) {
-                        map.remove();
-                        map = null;
-                    }
-                    map = L.map(mapContainer, {
-                        zoomControl: false,
-                        attributionControl: false
-                    }).setView([-7.9839, 112.6213], 12);
-                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {}).addTo(map);
-                    L.control.attribution({
-                        prefix: '<a href="https://leafletjs.com">Leaflet</a>',
-                        position: 'bottomright'
-                    }).addTo(map);
+            // === Templating & Rendering (Fungsi untuk membuat elemen HTML) ===
+            const formatPrice = (price) => new Intl.NumberFormat('id-ID', {
+                style: 'currency',
+                currency: 'IDR',
+                maximumFractionDigits: 0
+            }).format(price);
 
-                    for (const id in locations) {
-                        const loc = locations[id];
-                        const marker = L.marker([loc.lat, loc.lng]).addTo(map);
-                        marker.on('click', () => {
-                            updatePanelContent(id);
-                            if (window.innerWidth < 640) openPanel();
-                            map.flyTo([loc.lat, loc.lng], 15);
-                        });
-                    }
-                    document.getElementById('zoomInButton').addEventListener('click', () => map.zoomIn());
-                    document.getElementById('zoomOutButton').addEventListener('click', () => map.zoomOut());
-                    setTimeout(() => {
-                        map.invalidateSize(true);
-                    }, 1);
+            const renderSkeletonLoader = () => {
+                const skeletonCard =
+                    `<div class="p-4 animate-pulse"><div class="h-4 bg-gray-300 dark:bg-gray-700 rounded w-3/4 mb-2"></div><div class="h-3 bg-gray-300 dark:bg-gray-700 rounded w-1/2 mb-3"></div><div class="flex justify-between items-center"><div class="h-4 bg-gray-300 dark:bg-gray-700 rounded w-1/4"></div><div class="h-4 bg-gray-300 dark:bg-gray-700 rounded w-1/4"></div></div></div>`;
+                resultsList.innerHTML = Array(5).fill(skeletonCard).join('');
+            };
+
+            const renderSearchResults = (paginatedData) => {
+                resultsList.innerHTML = '';
+                resultsMeta.textContent = paginatedData.total > 0 ?
+                    `Menampilkan ${paginatedData.from}-${paginatedData.to} dari ${paginatedData.total} hasil.` :
+                    '';
+                if (paginatedData.data.length === 0) {
+                    resultsList.innerHTML =
+                        `<div class="p-8 text-center text-gray-500 dark:text-gray-400">Tidak ada hasil ditemukan.</div>`;
+                    markersLayer.clearLayers();
+                    return;
                 }
-
-                // --- Fungsi Panel ---
-                function forceMapResize() {
-                    if (!map) return;
-                    setTimeout(() => {
-                        map.invalidateSize({
-                            animate: true,
-                            duration: 0.5
-                        });
-                    }, 350);
-                }
-
-                function openPanel() {
-                    const isAlreadyOpen = !sidePanel.classList.contains('-translate-x-[110%]');
-                    if (isAlreadyOpen && window.innerWidth >= 640) return;
-                    sidePanel.classList.remove('-translate-x-[110%]');
-                    searchBarContainer.classList.remove('sm:left-16');
-                    searchBarContainer.classList.add('sm:left-[21.5rem]', 'md:left-[25.5rem]');
-                    if (window.innerWidth < 640) {
-                        openPanelButton.classList.add('opacity-0', 'pointer-events-none');
-                    }
-                    forceMapResize();
-                }
-
-                function closePanel() {
-                    sidePanel.classList.add('-translate-x-[110%]');
-                    searchBarContainer.classList.add('sm:left-16');
-                    searchBarContainer.classList.remove('sm:left-[21.5rem]', 'md:left-[25.5rem]');
-                    if (window.innerWidth < 640) {
-                        openPanelButton.classList.remove('opacity-0', 'pointer-events-none');
-                    }
-                    forceMapResize();
-                }
-
-                // --- Update Konten Panel ---
-                function updatePanelContent(locationId) {
-                    const data = locations[locationId];
-                    if (!data) return;
-                    document.getElementById('initialContent').classList.add('hidden');
-                    const detailContainer = document.getElementById('detailBarang');
-                    detailContainer.innerHTML = '';
-                    data.produk.forEach(item => {
-                        detailContainer.innerHTML +=
-                            `<div class="bg-gray-50 dark:bg-gray-700/70 p-3 rounded-lg shadow-md"><div class="flex justify-center mb-2"><i class="fas ${item.icon} text-4xl"></i></div><h3 class="text-md font-semibold text-green-600 dark:text-green-400 text-center">${item.nama}</h3><p class="text-xs text-gray-400 text-center mb-2">ID: ${item.id}</p><p class="text-sm text-gray-700 dark:text-gray-300">${item.deskripsi}</p><p class="text-sm font-semibold text-gray-800 dark:text-gray-200 mt-2">Harga: ${item.harga}</p></div>`;
-                    });
-                    const profilContainer = document.getElementById('profilToko');
-                    profilContainer.innerHTML =
-                        `<div class="bg-gray-50 dark:bg-gray-700/70 p-3 rounded-lg shadow-md"><div class="flex justify-center mb-2"><i class="fas fa-industry text-4xl text-gray-500"></i></div><h3 class="text-md font-semibold text-green-600 dark:text-green-400 text-center">${data.profil.nama}</h3><p class="text-sm text-gray-700 dark:text-gray-300 mt-2"><i class="fas fa-map-marker-alt w-4 mr-1"></i>${data.profil.alamat}</p></div>`;
-                    document.querySelectorAll('.tab-content').forEach(c => {
-                        if (c.id !== 'initialContent') c.classList.remove('hidden')
-                    });
-                    document.querySelector('.tab-button[data-tab-target="detailBarang"]').click();
-                }
-
-                // --- Event Listeners ---
-                openPanelButton.addEventListener('click', openPanel);
-                closePanelButtonMobile.addEventListener('click', closePanel);
-                const tabButtons = document.querySelectorAll('.tab-button');
-                tabButtons.forEach(button => {
-                    button.addEventListener('click', () => {
-                        const targetId = button.getAttribute('data-tab-target');
-                        tabButtons.forEach(btn => btn.classList.remove('active'));
-                        document.querySelectorAll('.tab-content').forEach(content => content.classList
-                            .add('hidden'));
-                        button.classList.add('active');
-                        document.getElementById(targetId).classList.remove('hidden');
-                    });
-                });
-
-                // --- Inisialisasi Awal ---
-                initializeMap();
-                window.addEventListener('resize', () => {
-                    if (map) {
-                        map.invalidateSize(false);
+                markersLayer.clearLayers();
+                paginatedData.data.forEach(item => {
+                    const card = document.createElement('div');
+                    card.className =
+                        `result-card p-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-200`;
+                    card.dataset.id = item.waste_id;
+                    card.innerHTML =
+                        `<h3 class="font-bold text-gray-800 dark:text-white">${item.waste_name}</h3><p class="text-sm text-gray-600 dark:text-gray-400">${item.store_name}</p><div class="flex justify-between items-center mt-2 text-sm"><span class="font-semibold text-green-600">${formatPrice(item.price)}</span><span class="text-gray-500 flex items-center"><i class="fa-solid fa-star text-yellow-400 mr-1"></i> ${parseFloat(item.average_rating).toFixed(1)}</span></div>`;
+                    card.addEventListener('click', () => showDetails(item.waste_id));
+                    resultsList.appendChild(card);
+                    if (item.latitude && item.longitude) {
+                        const marker = L.marker([item.latitude, item.longitude], {
+                            wasteId: item.waste_id
+                        }).on('click', () => showDetails(item.waste_id));
+                        markersLayer.addLayer(marker);
                     }
                 });
+                recenterMapToResults();
+            };
+
+            const renderDetailView = (item) => {
+                detailPane.innerHTML =
+                    `<div class="p-6"><button id="back-to-search-btn" class="mb-4 text-sm font-semibold text-green-600 hover:text-green-800 flex items-center"><i class="fa-solid fa-arrow-left mr-2"></i>Kembali ke Hasil</button><div class="space-y-4"><h2 class="text-2xl font-bold text-gray-900 dark:text-white">${item.waste_name}</h2><p class="text-md text-gray-600 dark:text-gray-300">Dijual oleh: <strong>${item.store_name}</strong></p><div class="p-4 bg-green-50 dark:bg-gray-800 rounded-lg space-y-3 text-sm"><div class="flex justify-between"><span class="text-gray-500 dark:text-gray-400">Harga</span><strong class="text-lg text-green-700 dark:text-green-400">${formatPrice(item.price)}</strong></div><div class="flex justify-between"><span class="text-gray-500 dark:text-gray-400">Stok Tersedia</span><strong class="dark:text-white">${item.stock}</strong></div><div class="flex justify-between"><span class="text-gray-500 dark:text-gray-400">Rating Toko</span><strong class="dark:text-white flex items-center"><i class="fa-solid fa-star text-yellow-400 mr-1"></i> ${parseFloat(item.average_rating).toFixed(1)}</strong></div></div><button class="w-full mt-4 px-6 py-3 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-green-600 hover:bg-green-700">Hubungi Penjual</button></div></div>`;
+                detailPane.querySelector('#back-to-search-btn').addEventListener('click', () => switchTab(
+                    'search-pane'));
+            };
+
+            const renderProfileView = () => {
+                profilePane.innerHTML =
+                    `<div class="p-6"> @auth <div class="flex items-center space-x-4 mb-6"><div class="w-16 h-16 bg-green-500 text-white rounded-full flex items-center justify-center text-2xl font-bold">{{ strtoupper(substr(Auth::user()->name, 0, 1)) }}</div><div><h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ Auth::user()->name }}</h3><p class="text-sm text-gray-500 dark:text-gray-400">{{ Auth::user()->email }}</p></div></div><div class="space-y-3"><a href="{{ route('profile.edit') }}" class="w-full flex items-center justify-center px-4 py-3 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700">Edit Profil</a><form method="POST" action="{{ route('logout') }}" class="w-full">@csrf<button type="submit" class="w-full flex items-center justify-center px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">Logout</button></form></div> @else <div class="text-center py-8"><h3 class="text-lg font-bold text-gray-900 dark:text-white">Akses Penuh Fitur</h3><p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Silakan login atau mendaftar untuk mengelola profil Anda.</p><div class="mt-6 flex justify-center gap-4"><a href="{{ route('login') }}" class="px-6 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700">Login</a><a href="{{ route('register') }}" class="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">Register</a></div></div> @endauth </div>`;
+            };
+
+            // === Fungsi Inti ===
+            const performSearch = async () => {
+                const params = new URLSearchParams(new FormData(searchForm));
+                if (userLocation && params.get('sort_by') === 'nearby') {
+                    params.append('latitude', userLocation.lat);
+                    params.append('longitude', userLocation.lng);
+                }
+                try {
+                    const response = await fetch(`{{ route('api.wastes.search') }}?${params.toString()}`);
+                    const results = await response.json();
+                    currentResults = results.data;
+                    renderSearchResults(results);
+                } catch (error) {
+                    resultsList.innerHTML =
+                        `<div class="p-8 text-center text-gray-500">Gagal memuat data.</div>`;
+                    console.error("Search Error:", error);
+                }
+            };
+            const debouncedSearch = debounce(performSearch, 400);
+
+            const showDetails = (wasteId) => {
+                const item = currentResults.find(r => r.waste_id === wasteId);
+                if (!item) return;
+                activeWasteId = wasteId;
+                renderDetailView(item);
+                switchTab('detail-pane');
+                markersLayer.eachLayer(marker => {
+                    const icon = marker.getIcon();
+                    if (marker.options.wasteId === wasteId) {
+                        leafletMap.flyTo(marker.getLatLng(), 15);
+                        icon.options.className += ' active-marker';
+                    } else {
+                        icon.options.className = icon.options.className.replace(' active-marker', '');
+                    }
+                    marker.setIcon(icon);
+                });
+                document.querySelectorAll('.result-card').forEach(c => c.classList.toggle('active', c.dataset
+                    .id == wasteId));
+            };
+
+            const recenterMapToResults = () => {
+                const bounds = markersLayer.getBounds();
+                if (bounds.isValid()) {
+                    leafletMap.flyToBounds(bounds, {
+                        padding: [50, 50],
+                        maxZoom: 15
+                    });
+                }
+            };
+
+            const findUserLocation = () => leafletMap.locate({
+                setView: true,
+                maxZoom: 15
             });
 
-
-            // --- Modal Functions ---
-            const modalContainer = document.getElementById('modal-container');
-            const modalContent = document.getElementById('modal-content');
-            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content'); // Jika Anda butuh CSRF
-
-            // Fungsi untuk menutup modal
-            function closeModal(event) {
-                // Hanya tutup jika klik di luar area konten modal
-                if (event.target === modalContainer) {
-                    modalContainer.classList.add('hidden');
-                    modalContainer.classList.remove('flex');
-                    modalContent.innerHTML = ''; // Kosongkan konten
-                }
+            function debounce(func, wait) {
+                let timeout;
+                return function executedFunction(...args) {
+                    const later = () => {
+                        clearTimeout(timeout);
+                        func(...args);
+                    };
+                    clearTimeout(timeout);
+                    timeout = setTimeout(later, wait);
+                };
             }
 
-            // Fungsi untuk membuka modal dan memuat daftar toko
-            async function openManageStoresModal() {
-                // Tampilkan loading spinner jika ada
-                modalContent.innerHTML = '<div class="p-8 text-center">Memuat daftar toko...</div>';
-                modalContainer.classList.remove('hidden');
-                modalContainer.classList.add('flex');
+            // === UI & Event Listeners ===
+            const togglePanel = (forceOpen = null) => {
+                const isOpen = panel.classList.contains('is-open');
+                if (forceOpen === true || (forceOpen === null && !isOpen)) panel.classList.add('is-open');
+                else panel.classList.remove('is-open');
+                setTimeout(() => leafletMap.invalidateSize(), 400);
+            };
 
-                try {
-                    // Panggil API dari StoreController@index
-                    const response = await fetch('/api/stores', { // Sesuaikan URL jika perlu
-                        headers: {
-                            'Accept': 'application/json',
-                            'X-CSRF-TOKEN': csrfToken // Kirim CSRF jika route API dilindungi olehnya
-                        }
-                    });
+            const switchTab = (targetTabId) => {
+                document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+                document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+                document.getElementById(targetTabId).classList.add('active');
+                document.querySelector(`button[data-tab="${targetTabId}"]`).classList.add('active');
+                document.querySelector(`button[data-tab="detail-pane"]`).disabled = (targetTabId !==
+                    'detail-pane');
+            };
 
-                    if (!response.ok) throw new Error('Gagal memuat data.');
+            mobilePanelToggle.addEventListener('click', () => togglePanel());
+            panelCloseBtn.addEventListener('click', () => togglePanel(false));
+            document.querySelectorAll('.tab-button').forEach(b => b.addEventListener('click', (e) => switchTab(e
+                .currentTarget.dataset.tab)));
+            searchForm.addEventListener('input', debouncedSearch);
+            searchForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                performSearch();
+            });
+            getLocationBtn.addEventListener('click', findUserLocation);
+            recenterMapBtn.addEventListener('click', recenterMapToResults);
 
-                    const stores = await response.json();
+            leafletMap.on('locationfound', (e) => {
+                userLocation = e.latlng;
+                L.marker(userLocation, {
+                    icon: L.divIcon({
+                        className: 'p-2 bg-blue-500 rounded-full border-4 border-white shadow-lg'
+                    })
+                }).addTo(leafletMap);
+                document.querySelector('#sort_by option[value="nearby"]').disabled = false;
+            });
+            leafletMap.on('locationerror', (e) => alert("Tidak dapat menemukan lokasi Anda: " + e.message));
 
-                    // Bangun HTML dari data JSON yang diterima
-                    let storesHtml = stores.map(store => `
-                <div id="store-${store.id}" class="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border dark:border-gray-600">
-                    <div class="flex items-center space-x-4">
-                        <img src="${store.image_url}" alt="${store.name}" class="w-16 h-16 object-cover rounded-md">
-                        <div>
-                            <p class="font-bold text-gray-800 dark:text-white">${store.name}</p>
-                            <p class="text-sm text-gray-600 dark:text-gray-400">${store.address}</p>
-                        </div>
-                    </div>
-                    <div class="flex space-x-2">
-                        <button onclick="openStoreFormModal(${store.id})" class="p-2 text-blue-500 hover:text-blue-700" title="Edit Toko"><i class="fas fa-edit"></i></button>
-                        <button onclick="deleteStore(${store.id}, '${store.name}')" class="p-2 text-red-500 hover:text-red-700" title="Hapus Toko"><i class="fas fa-trash"></i></button>
-                    </div>
-                </div>
-            `).join('');
+            // === Inisiasi Aplikasi ===
+            switchTab('search-pane');
+            renderProfileView();
+            performSearch();
+            if (window.innerWidth >= 768) togglePanel(true);
+        });
 
-                    // Final HTML untuk modal
-                    const modalHtml = `
-                <div class="flex items-center justify-between p-4 border-b dark:border-gray-700">
-                    <h2 class="text-xl font-bold text-gray-900 dark:text-white">Manajemen Toko Saya</h2>
-                    <button onclick="openStoreFormModal()" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"><i class="fas fa-plus mr-1"></i> Buat Toko Baru</button>
-                </div>
-                <div class="p-6 overflow-y-auto space-y-4">
-                    ${stores.length > 0 ? storesHtml : '<div class="text-center py-10"><p class="text-gray-500">Anda belum memiliki toko.</p></div>'}
-                </div>
-            `;
+        // Tambahkan ini di dalam event listener DOMContentLoaded
+        document.querySelectorAll('.accordion-header').forEach(header => {
+            header.addEventListener('click', () => {
+                const content = header.nextElementSibling;
 
-                    modalContent.innerHTML = modalHtml;
-
-                } catch (error) {
-                    modalContent.innerHTML = `<div class="p-8 text-center text-red-500">Error: ${error.message}</div>`;
-                }
-            }
-
-            // Fungsi untuk memuat form (Create/Edit) dari Blade Partial
-            async function openStoreFormModal(storeId = null) {
-                const url = storeId ? `/modals/store-form/${storeId}` : '/modals/store-form';
-                try {
-                    const response = await fetch(url);
-                    if (!response.ok) throw new Error('Gagal memuat form.');
-
-                    const formHtml = await response.text();
-                    modalContent.innerHTML = formHtml;
-                    // Pastikan modal sudah terlihat jika belum
-                    modalContainer.classList.remove('hidden');
-                    modalContainer.classList.add('flex');
-                } catch (error) {
-                    modalContent.innerHTML = `<div class="p-8 text-center text-red-500">Error: ${error.message}</div>`;
-                }
-            }
-
-            // Fungsi untuk menangani submit form (Create/Update)
-            async function handleStoreFormSubmit(event) {
-                event.preventDefault();
-                const form = event.target;
-                const formData = new FormData(form);
-                const storeId = form.dataset.storeId;
-
-                const url = storeId ? `/api/stores/${storeId}` : '/api/stores';
-                // Untuk update via form-data, kita POST dan tambahkan _method
-                if (storeId) formData.append('_method', 'PATCH');
-
-                try {
-                    const response = await fetch(url, {
-                        method: 'POST', // Selalu POST untuk FormData dengan file
-                        body: formData,
-                        headers: {
-                            'Accept': 'application/json',
-                            'X-CSRF-TOKEN': csrfToken
-                        }
-                    });
-
-                    const result = await response.json();
-
-                    if (!response.ok) {
-                        // Tampilkan error validasi jika ada
-                        if (result.errors) {
-                            Object.keys(result.errors).forEach(key => {
-                                const errorEl = form.querySelector(`#error-${key}`);
-                                if (errorEl) errorEl.textContent = result.errors[key][0];
-                            });
-                        }
-                        throw new Error(result.message || 'Terjadi kesalahan.');
+                // Tutup semua accordion lain
+                document.querySelectorAll('.accordion-content.open').forEach(openContent => {
+                    if (openContent !== content) {
+                        openContent.classList.remove('open');
+                        openContent.previousElementSibling.classList.remove('open');
                     }
+                });
 
-                    // Jika berhasil, muat ulang daftar toko
-                    alert(result.message); // Notifikasi sederhana
-                    openManageStoresModal();
+                // Toggle accordion yang diklik
+                header.classList.toggle('open');
+                content.classList.toggle('open');
+            });
+        });
+    </script>
+</body>
 
-                } catch (error) {
-                    alert(`Error: ${error.message}`);
-                }
-            }
-
-            // Fungsi untuk menghapus toko
-            async function deleteStore(storeId, storeName) {
-                if (!confirm(`Apakah Anda yakin ingin menghapus toko "${storeName}"?`)) return;
-
-                try {
-                    const response = await fetch(`/api/stores/${storeId}`, {
-                        method: 'DELETE',
-                        headers: {
-                            'Accept': 'application/json',
-                            'X-CSRF-TOKEN': csrfToken
-                        }
-                    });
-
-                    const result = await response.json();
-                    if (!response.ok) throw new Error(result.message);
-
-                    alert(result.message);
-                    // Hapus elemen dari DOM tanpa perlu reload semua
-                    document.getElementById(`store-${storeId}`).remove();
-                } catch (error) {
-                    alert(`Error: ${error.message}`);
-                }
-            }
-        </script>
-    @endpush
-
-</x-map-layout>
+</html>
