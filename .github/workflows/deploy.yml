@@ -24,10 +24,21 @@ jobs:
           extensions: mbstring, bcmath, pdo, pdo_pgsql
           tools: composer
 
-      - name: Install dependencies
+      - name: Install PHP dependencies
         run: |
           cd laravel
           composer install --no-dev --optimize-autoloader
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install Node dependencies and build assets
+        run: |
+          cd laravel
+          npm install
+          npm run build
 
       - name: Prepare deployment folder
         run: |
