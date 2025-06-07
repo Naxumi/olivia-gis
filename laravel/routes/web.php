@@ -12,6 +12,7 @@ use App\Http\Controllers\TransactionController;
 use App\Models\Waste;
 use App\Models\Transaction;
 use App\Http\Controllers\LogisticsController; // Kita akan buat controller ini
+use App\Http\Controllers\DocumentController; // <-- Tambahkan import ini di atas
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 
@@ -30,6 +31,12 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 //======================================================================
 // RUTE PUBLIK (Dapat Diakses oleh Siapa Saja/Tamu)
 //======================================================================
+
+// Rute ini akan mengarahkan URL /dokumentasi-teknis ke controller
+// untuk menampilkan file PDF.
+Route::get('/dokumentasi-teknis', [DocumentController::class, 'showTechnicalDocumentation'])
+    ->name('docs.technical');
+
 
 // Halaman utama / landing page
 Route::get('/', function () {
