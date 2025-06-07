@@ -140,7 +140,7 @@ class StoreController extends Controller
     }
 
     /**
-     * Menampilkan detail satu toko.
+     * Menampilkan detail satu toko beserta limbah dan gambar-gambarnya.
      * GET /api/stores/{store}
      */
     public function show(Store $store): JsonResponse
@@ -152,19 +152,19 @@ class StoreController extends Controller
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
-        // Otorisasi: Pemilik toko atau admin bisa melihat detail.
-        // Buyer/Distributor juga bisa melihat detail toko publik.
-        $canView = false;
-        if ($user->id === $store->user_id || $user->hasRole('admin') || $user->hasRole('buyer') || $user->hasRole('distributor')) {
-            $canView = true;
-        }
-
-        if (!$canView) {
+        // Otorisasi: Pemilik toko, admin, buyer, atau distributor bisa melihat detail toko publik.
+        if (!($user->id === $store->user_id || $user->hasRole(['admin', 'buyer', 'distributor']))) {
             return response()->json(['message' => 'Anda tidak diizinkan untuk melihat toko ini.'], 403);
         }
 
-        // Eager load relasi yang mungkin dibutuhkan oleh SPA
-        $store->load(['user:id,name', 'wastes', 'wastes.category', 'wastes.wasteVariants']);
+        // --- PERUBAHAN DI SINI ---
+        // Eager load relasi yang dibutuhkan oleh SPA, termasuk gambar untuk setiap limbah.
+        $store->load([
+            'user:id,name', // Pemilik toko
+            'wastes.images', // Muat relasi 'images' dari setiap 'waste'
+            'wastes.category', // Muat relasi 'category' dari setiap 'waste'
+            'wastes.wasteVariants' // Muat relasi 'wasteVariants' dari setiap 'waste'
+        ]);
 
         return response()->json($store);
     }
