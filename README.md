@@ -1,6 +1,8 @@
 # EcoBarter: Geospatial-Driven Waste Revolution
 
-**Submission untuk Lomba Web Technology OLIVIA X 2025 Universitas Brawijaya**
+> [!WARNING]  
+> **Status Proyek: Tidak Aktif / Archived**  
+> Proyek ini dikembangkan secara khusus sebagai *Submission* untuk Lomba Web Technology OLIVIA X 2025 Universitas Brawijaya dan saat ini **sudah tidak dikembangkan (maintain) lagi**. Codebase ini diarsipkan sebagai bagian dari portofolio.
 
 **Nama Tim:** Green Flag
 **Perguruan Tinggi:** Universitas Brawijaya
@@ -70,8 +72,8 @@ Repository ini bersifat *private*. Panitia akan diundang sebagai kolaborator. Un
 
 1.  **Clone Repository:**
     ```bash
-    git clone https://www.andarepository.com/
-    cd nama-proyek
+    git clone https://github.com/Naxumi/olivia-gis.git
+    cd olivia-gis/laravel
     ```
 
 2.  **Instal Dependensi:**
