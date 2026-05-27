@@ -18,6 +18,8 @@
 
 Link : https://laravel-webgis-btgkadgpe9gwdndf.southeastasia-01.azurewebsites.net/
 
+[Dokumentasi Teknis](https://drive.google.com/file/d/1SKdxtxPiTwkndBeW7OArCqOS5NZQb9i7/view?usp=sharing)
+
 ---
 
 ## 1. Deskripsi Aplikasi
